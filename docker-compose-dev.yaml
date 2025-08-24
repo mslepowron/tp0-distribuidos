@@ -53,6 +53,17 @@ services:
       - testing_net
     depends_on:
       - server
+  client5:
+    container_name: client5
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_ID=5
+      - CLI_LOG_LEVEL=DEBUG
+    networks:
+      - testing_net
+    depends_on:
+      - server
 networks:
   testing_net:
     ipam:
