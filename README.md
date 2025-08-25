@@ -47,6 +47,16 @@ Para ello, se toman los datos del Puerto y la IP del servidor de su respectivo a
 Se captura la respuesta del server en uan variable Response, y se verifica que esta sea exactamente la misma que el mensaje enviado. Esto determinaría que el server está funcionando correctamente.
 
 **Uso:**  
+  El usuario debe contar con los permisos necesarios para correr ambos scripts de bash. Si no los tiene:
+
+  ```
+  chmod +x generar-compose.sh
+  ```
+
+  ```
+  chmod +x validar-echo-server.sh
+  ```
+
   Se puede generar desde la raíz del proyecto el archivo de configuración inicial como se hizo en los ejercicios previos:
   ```
   ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
