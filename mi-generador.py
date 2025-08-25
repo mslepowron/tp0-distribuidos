@@ -12,6 +12,8 @@ services:
       - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
+    volumes:
+      - ./server/config.ini:/app/config.ini
 """
 
     for client_number in range(1, clients + 1):
@@ -24,6 +26,8 @@ services:
       - CLI_LOG_LEVEL=DEBUG
     networks:
       - testing_net
+    volumes:
+      - ./client/config.yaml:/app/config.yaml
     depends_on:
       - server
 """
