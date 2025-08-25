@@ -13,7 +13,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./server/config.ini:/server/config.ini
+      - ./server/config.ini:/config.ini
 """
 
     for client_number in range(1, clients + 1):
