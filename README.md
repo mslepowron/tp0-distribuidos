@@ -29,3 +29,35 @@ Para correrlo, se puede continuar utilizando el generador de script del ejercici
   ```
   ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
   ```
+
+  y luego se levantan los containers de docker con el comando:
+
+  ```
+  make docker-compose-up
+  ```
+
+---
+
+### Ejercicio 3
+
+Se desarrolló un script ```validar-echo-server.sh ``` que testea el correcto funcionamiento del echo server con netcat.
+
+Para ello, se toman los datos del Puerto y la IP del servidor de su respectivo archivo de configuracion, y luego se corre un comando de docker que levanta un nuvo contenedor en la red interna del tp (testing_net). Se levanta una imagen liviana de Linux (alpine) y se envía un mensaje al echo server para testear el funcionamiento. 
+
+Se captura la respuesta del server en uan variable Response, y se verifica que esta sea exactamente la misma que el mensaje enviado. Esto determinaría que el server está funcionando correctamente.
+
+**Uso:**  
+  Se puede generar desde la raíz del proyecto el archivo de configuración inicial como se hizo en los ejercicios previos:
+  ```
+  ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
+  ```
+
+  Luego levantamos los contenedores correspondientes:
+  ```
+  make docker-compose-up
+  ```
+
+  Y corremos el script de verificacion de funcionamiento del servidor:
+  ```
+  ./validar-echo-server.sh
+  ```
