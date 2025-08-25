@@ -13,7 +13,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./server/config.ini:/app/config.ini
+      - ./server/config.ini:/config.ini
 """
 
     for client_number in range(1, clients + 1):
@@ -27,7 +27,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./client/config.yaml:/app/config.yaml
+      - ./client/config.yaml:/config.yaml
     depends_on:
       - server
 """
