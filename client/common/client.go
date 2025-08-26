@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 	"os"
+	"os/signal"
 
 	"github.com/op/go-logging"
 )
@@ -55,7 +56,19 @@ func (c *Client) createClientSocket() error {
 func (c *Client) StartClientLoop() {
 	// There is an autoincremental msgID to identify every message sent
 	// Messages if the message amount threshold has not been surpassed
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+		select {
+		case <-sigChannel:
+			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
+			if c.conn != nil {
+				c.conn.Close()
+			}
+			return
+		default:
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
 

@@ -80,6 +80,10 @@ Se agregó una funcion shutdown_server() para cerrar ordenadamente los recursos 
 
 El proceso luego termina de forma controlada con ``` sys.exit(0)```
 
+En cuanto al Client, se creo un canal sigChannel que puede recibir señales ```SIGTERM```. Cuando se inicia la iteracion en loop del cliente, se chequea si en el canal se recibio alguna señal (caso en el cual se hace el shutdown).
+
+De esta manera, el cliente tambien cierra de manera segura si se apaga el contenedor de Docker.
+
 Podemos probar que los sistemas terminan de manera graceful utilizando el comando ```docker compose down``` acompañado del flag ```-t```
 
 Docker va a enviar la señal ```SIGTERM```, y si los procesos saben manejarla, tienen hasta ´t´ segundos para cerrar todo ordenadamente. Sino, Docker envia ```SIGKILL``` para matar al proceso.
