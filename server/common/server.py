@@ -1,5 +1,7 @@
 import socket
 import logging
+import signal
+import sys
 
 
 class Server:
@@ -8,6 +10,29 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+        self.shutdown = False
+        self.client_sockets = []
+
+
+    def shutdown_server(self):
+        if self.shutdown:
+            return
+        
+        self.shutdown = True
+        logging.info('action: shutdown | result: in_progress')
+        try:
+            self._server_socket.close()
+            for client_sock in self.client_sockets:
+                try:
+                    client_sock.close()
+                except Exception as e:
+                    logging.info(f'action: close_client_socket | result: fail')
+                else:
+                    logging.info(f'action: close_client_socket | result: success')
+            logging.info(f'action: shutdown | result: success')
+        except Exception as e:
+            logging.error(f'action: shutdown | result: fail')
+
 
     def run(self):
         """
@@ -20,9 +45,14 @@ class Server:
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+        while not self.shutdown:
+            try:
+                client_sock = self.__accept_new_connection()
+                self.client_sockets.append(client_sock)
+                self.__handle_client_connection(client_sock)
+            except:
+                if self.shutdown:
+                    break
 
     def __handle_client_connection(self, client_sock):
         """
@@ -42,6 +72,8 @@ class Server:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
+            if client_sock in self.client_sockets:
+                self.client_sockets.remove(client_sock)
 
     def __accept_new_connection(self):
         """

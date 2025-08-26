@@ -71,3 +71,31 @@ Se captura la respuesta del server en uan variable Response, y se verifica que e
   ```
   ./validar-echo-server.sh
   ```
+
+---
+
+### Ejercicio 4
+
+Se agregó una funcion shutdown_server() para cerrar ordenadamente los recursos del socket del servidor, y los sockets de los clientes conectados y se registra esto mismo en logs que van detallando el proceso.
+
+El proceso luego termina de forma controlada con ``` sys.exit(0)```
+
+Podemos probar que los sistemas terminan de manera graceful utilizando el comando ```docker compose down``` acompañado del flag ```-t```
+
+Docker va a enviar la señal ```SIGTERM```, y si los procesos saben manejarla, tienen hasta ´t´ segundos para cerrar todo ordenadamente. Sino, Docker envia ```SIGKILL``` para matar al proceso.
+
+  **Uso:**  
+  Se corre para generar el archivo de configuracion, desde la raiz del proyecto:
+  ```
+  ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
+  ```
+
+  Se levantan los contenedores de docker:
+  ```
+  make docker-compose-up
+  ```
+  Corremos el siguiente comando de docker para bajar los container y enviar la señal ```SIGTERM```
+
+  ```
+  docker compose -f docker-compose-dev.yaml down -t 15
+  ```
