@@ -25,13 +25,15 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
+	bet Bet
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig) *Client {
+func NewClient(config ClientConfig, bet Bet) *Client {
 	client := &Client{
 		config: config,
+		bet: bet,
 	}
 	return client
 }
@@ -80,6 +82,10 @@ func (c *Client) StartClientLoop() {
 			msgID,
 		)
 		msg, err := bufio.NewReader(c.conn).ReadString('\n')
+
+		//aca habria que formatear el mensaje de bet, borrar este fmt.Fprintf
+		//despues llamar a una funcion de send que gestione el short read
+		//con un prefijo de cantidad de bytes o algo asi.
 		c.conn.Close()
 
 		if err != nil {

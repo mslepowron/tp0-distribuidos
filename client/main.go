@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
 	"strings"
 	"time"
 
@@ -113,6 +112,8 @@ func main() {
 
 	// sigChan := make(chan os.Signal, 1)
 	// signal.Notify(sigChan, syscall.SIGTERM)  ya esta en client.go
+
+	bet := common.BetData(clientConfig.ID)
 
 	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
