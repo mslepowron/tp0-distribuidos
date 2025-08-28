@@ -103,3 +103,39 @@ Docker va a enviar la señal ```SIGTERM```, y si los procesos saben manejarla, t
   ```
   docker compose -f docker-compose-dev.yaml down -t 15
   ```
+
+---
+
+### Ejercicio 5
+
+Como planteo inicial se implentó un modulo _agency message_ para el cliente. Los datos de la apuesta se definen como variables de entorno, y se utilizan para construir un mensaje con el siguiente formato:
+
+ ``` go
+msg := fmt.Sprintf("%s|%s|%s|%s|%s|%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number) 
+```
+
+Por otro lado, en la funcion ```StartClientLoop()``` del modulo client, se crea el socket, se formatea el mensaje especificado arriba y se llama a una funcion ```SendClientMessage()``` que se encarga de enviarle el mensaje con los datos de la apuesta al servidor.
+
+En cuanto al envío de los datos, en go, utilizar
+``` go
+conn.Write(message)
+```
+a secas no nos garantiza que se envíen todos los datos que queremos. Puede suceder que la cantidad de bytes enviados sea menor al largo total de los datos (short write), por ejemplo, porque el buffer del socket estaba lleno y solo acepto y envió una parte.
+
+Para evitar que esto suceda, se tuvieron en cuenta dos cosas:
+
+Por un lado, establecer un limite de tamaño máximo de mensaje a enviar (8KB). Esto evita saturar el buffer del socket, aporta algo de robustez y seguridad (por ejemplo evitando que in cliente malicioso mande mesajes excesivamente grandes que saturen el servidor o provoquen un DoS), y aporta simplicidad; mantener mensajes de tamaño moderado facilita el manejo de buffers y control de errores.
+
+Por otro lado, se implementó una función ```WriteFull()``` donde se repite la operación de escritura en un loop hasta que efectivamente se hallan enviado todos los bytes del mensaje, evitando el envío de mensajes incompletos.
+
+El mensaje con los datos de la apuesta es precedido por un mensaje de tamaño de 4 bytes que contiene la longitud del mensaje del cliente. Este paso se realiza para que el server sepa cuántos bytes tiene que leer y así evitar un short read.
+
+El cliente espera un mensaje de confirmación de parte del servidor para verificar que haya recibio correctamente los datos de la apuesta. Este mismo contiene los datos que presenta el log del server cuando persiste una apuesta correctamente; es decir, el DNI y el Numero del cliente.
+
+Si el cliente no recibe este mensaje de confirmación, retorna un error y logguea el problema.
+
+Ideas refactorizacion:
+  - que la serializacion del mensaje sea con un json (mas flexible, legible, no es necesario saber el orden de los campos, es una heraamienta comun entre todos los lenguajes etc)
+  - que si falla el envio del client se reintente (3 veces por ej) para + tolerancia a fallos; excepto que supere la capacidad maxima (eso igual creo q se puede resolver en el 6 con los chunks)
+  - chequeo de errores terminales (si se cerro la conexion abortar y termina) ?
+  - chequear codigos de error correspondientes en cada caso

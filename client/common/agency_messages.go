@@ -1,7 +1,10 @@
 package common
 
 import (
+	"bufio"
+	"encoding/binary"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	// "github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
@@ -64,4 +67,61 @@ func FormatMessage(bet Bet) string {
 	msg := fmt.Sprintf("%s|%s|%s|%s|%s|%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number)
 
 	return msg
+}
+
+func WriteFull(connection net.Conn, data []byte) error {
+	totalWritten := 0
+	dataLength := len(data)
+
+	for totalWritten < dataLength {
+		bytesWritten, err := connection.Write(data[totalWritten:])
+		if err != nil {
+			return err
+		}
+		totalWritten += bytesWritten
+	}
+
+	return nil
+}
+
+// lo que se envia es un mensaje. No nos interesa en esta capa de comunicacion
+// si es una bet u otra cosa. Aca nos interesa el envio
+func SendClientMessage(connection net.Conn, message string) error {
+
+	if len(message) > 8182 {
+		log.Critical("action: send_client_message | result: fail | message is bigger than 8KB")
+		return fmt.Errorf("message is bigger than 8KB")
+	}
+
+	messageBytes := []byte(message)
+
+	messageLength := make([]byte, 4)
+	binary.BigEndian.PutUint32(messageLength, uint32(len(messageBytes)))
+
+	//try send message length
+	if err := WriteFull(connection, messageLength); err != nil {
+		return err
+	}
+
+	//send agency data
+	return WriteFull(connection, messageBytes)
+}
+
+func RecieveServerAck(connection net.Conn) (string, error) {
+	reader := bufio.NewReader(connection)
+
+	msg, err := reader.ReadString('\n')
+	if err != nil {
+		log.Critical("action: recieve_server_ack | result: fail | error reading Ack message")
+		return "", fmt.Errorf("error reading Ack message: %w", err)
+	}
+
+	msg = strings.TrimSpace(msg)
+
+	if len(msg) > 8192 {
+		log.Critical("action: receive_server_ack | result: fail | server ack message is too large")
+		return "", fmt.Errorf("server ack message is too large")
+	}
+
+	return msg, nil
 }

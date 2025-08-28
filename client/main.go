@@ -115,6 +115,6 @@ func main() {
 
 	bet := common.BetData(clientConfig.ID)
 
-	client := common.NewClient(clientConfig)
+	client := common.NewClient(clientConfig, *bet)
 	client.StartClientLoop()
 }
