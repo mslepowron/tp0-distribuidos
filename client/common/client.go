@@ -118,7 +118,7 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		server_ack := strings.Split(ack, "|")
+		server_ack := strings.Split(ack, ";")
 		ack_document, _ := strconv.Atoi(strings.TrimSpace(server_ack[0]))
 		ack_number, _ := strconv.Atoi(strings.TrimSpace(server_ack[1]))
 

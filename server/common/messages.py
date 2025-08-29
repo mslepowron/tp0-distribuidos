@@ -25,7 +25,7 @@ def recieve_client_messasge(client_sock: socket.socket) -> str:
     return message
 
 def decode_message(message: str) -> Bet:
-    parts = message.split("|")
+    parts = message.split(";")
     if len(parts) != 6:
         raise ValueError(f"Invalid bet format: {message}")
 

@@ -60,7 +60,7 @@ func FormatMessage(bet Bet) string {
 		}
 	}
 
-	msg := fmt.Sprintf("%s|%s|%s|%s|%s|%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number)
+	msg := fmt.Sprintf("%s;%s;%s;%s;%s;%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number)
 
 	return msg
 }

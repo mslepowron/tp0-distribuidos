@@ -81,7 +81,7 @@ class Server:
             #log save bet
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
             #send ack
-            ack_str = "{}|{}\n".format(bet.document, bet.number)
+            ack_str = "{};{}\n".format(bet.document, bet.number)
             ack_bytes = ack_str.encode("utf-8")
             messages.send_ack_client(client_sock, ack_bytes)
         except OSError as e:

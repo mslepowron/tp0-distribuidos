@@ -111,7 +111,7 @@ Docker va a enviar la señal ```SIGTERM```, y si los procesos saben manejarla, t
 Como planteo inicial se implentó un modulo _agency message_ para el cliente. Los datos de la apuesta se definen como variables de entorno, y se utilizan para construir un mensaje con el siguiente formato:
 
  ``` go
-msg := fmt.Sprintf("%s|%s|%s|%s|%s|%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number) 
+msg := fmt.Sprintf("%s;%s;%s;%s;%s;%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number) 
 ```
 
 Por otro lado, en la funcion ```StartClientLoop()``` del modulo client, se crea el socket, se formatea el mensaje especificado arriba y se llama a una funcion ```SendClientMessage()``` que se encarga de enviarle el mensaje con los datos de la apuesta al servidor.
