@@ -73,7 +73,7 @@ class Server:
             
             # decode cliet msg
             message = messages.recieve_client_messasge(client_sock)
-            logging.info('action: recieved_client_message | result: succes | ip: {addr[0]} | msg: {msg}')
+            logging.info(f'action: recieved_client_message | result: succes | ip: {addr[0]} | msg: {msg}')
             #save bet
             bet = messages.decode_message(message)
             utils.store_bets([bet])
