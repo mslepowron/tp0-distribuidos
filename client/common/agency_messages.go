@@ -108,7 +108,7 @@ func RecieveServerAck(connection net.Conn) (string, error) {
 
 	msg, err := reader.ReadString('\n')
 	if err != nil {
-		log.Critical("action: receive_server_ack | result: fail | error reading Ack message")
+		log.Critical("action: receive_server_ack | result: fail | error: reading Ack message")
 		return "", fmt.Errorf("error reading Ack message: %w", err)
 	}
 
