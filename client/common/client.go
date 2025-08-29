@@ -118,8 +118,6 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		c.conn.Close()
-
 		server_ack := strings.Split(ack, "|")
 		ack_document, _ := strconv.Atoi(strings.TrimSpace(server_ack[0]))
 		ack_number, _ := strconv.Atoi(strings.TrimSpace(server_ack[1]))
@@ -132,6 +130,8 @@ func (c *Client) StartClientLoop() {
 		} else {
 			log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
 		}
+
+		c.conn.Close()
 		//EXTRAR CAMPOS ACK DEL SERVER: DOCUMENTO Y NUMERO para imprimir log de succes o fail
 	}
 }
