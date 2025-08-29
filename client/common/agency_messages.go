@@ -32,10 +32,6 @@ func BetData(clientID string) *Bet {
 		return nil
 	}
 
-	log.Criticalf(
-		"action: connect | result: fail | missing bet information for agency: %v", clientID,
-	)
-
 	bet := &Bet{
 		AgencyId:  clientID,
 		Name:      betName,
@@ -112,7 +108,7 @@ func RecieveServerAck(connection net.Conn) (string, error) {
 
 	msg, err := reader.ReadString('\n')
 	if err != nil {
-		log.Critical("action: recieve_server_ack | result: fail | error reading Ack message")
+		log.Critical("action: receive_server_ack | result: fail | error reading Ack message")
 		return "", fmt.Errorf("error reading Ack message: %w", err)
 	}
 

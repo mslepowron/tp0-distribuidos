@@ -130,12 +130,30 @@ Por otro lado, se implementó una función ```WriteFull()``` donde se repite la 
 
 El mensaje con los datos de la apuesta es precedido por un mensaje de tamaño de 4 bytes que contiene la longitud del mensaje del cliente. Este paso se realiza para que el server sepa cuántos bytes tiene que leer y así evitar un short read.
 
+Es decir, el protocolo esta conformado por 4 bytes (message length) + payload (client message)
+
 El cliente espera un mensaje de confirmación de parte del servidor para verificar que haya recibio correctamente los datos de la apuesta. Este mismo contiene los datos que presenta el log del server cuando persiste una apuesta correctamente; es decir, el DNI y el Numero del cliente.
 
 Si el cliente no recibe este mensaje de confirmación, retorna un error y logguea el problema.
 
+  **Uso:**  
+  Se debe correr, desde la raiz del proyecto:
+  ```
+  ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
+  ```
+  por ejemplo:
+  ```
+  ./generar-compose.sh docker-compose-dev.yaml 1
+  ```
+  Luego se levanta el sistema con:
+    ```
+  make docker-compose-up
+  ```
+
+
 Ideas refactorizacion:
   - que la serializacion del mensaje sea con un json (mas flexible, legible, no es necesario saber el orden de los campos, es una heraamienta comun entre todos los lenguajes etc)
   - que si falla el envio del client se reintente (3 veces por ej) para + tolerancia a fallos; excepto que supere la capacidad maxima (eso igual creo q se puede resolver en el 6 con los chunks)
+  - uso de constantes para tamanos maximos, errores, etc.
   - chequeo de errores terminales (si se cerro la conexion abortar y termina) ?
   - chequear codigos de error correspondientes en cada caso

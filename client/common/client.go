@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -62,74 +64,74 @@ func (c *Client) StartClientLoop() {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		select {
-		case <-sigChannel:
-			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-			if c.conn != nil {
-				c.conn.Close()
-			}
-			return
-		default:
-			bet := BetData(c.config.ID)
-			if bet == nil {
-				return
-			}
-
-			client_message := FormatMessage(*bet)
-			if client_message == "" {
-				return
-			}
-
-			// Create the connection the server in every loop iteration. Send an
-			c.createClientSocket()
-
-			// TODO: Modify the send to avoid short-write
-			// fmt.Fprintf(
-			// 	c.conn,
-			// 	"[CLIENT %v] Message N°%v\n",
-			// 	c.config.ID,
-			// 	msgID,
-			// ) //en esta lectura tengo que asegurarme que tampoco haya short read de la rta del server
-			// msg, err := bufio.NewReader(c.conn).ReadString('\n')
-
-			if err := SendClientMessage(c.conn, client_message); err != nil {
-				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				c.conn.Close()
-				return
-			}
-
-			ack, err := RecieveServerAck(c.conn)
-			if err != nil {
-				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
-				c.conn.Close()
-				return
-			}
-
-			//aca habria que formatear el mensaje de bet, borrar este fmt.Fprintf
-			//despues llamar a una funcion de send que gestione el short read
-			//con un prefijo de cantidad de bytes o algo asi.
-
-			if err != nil {
-				log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-
-			println("Client %v received ack: %s\n", c.config.ID, ack) //solo pongo el print para que no tire error. Hay que decodear el ack del server
-
+	select {
+	case <-sigChannel:
+		log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
+		if c.conn != nil {
 			c.conn.Close()
-
-			//EXTRAR CAMPOS ACK DEL SERVER: DOCUMENTO Y NUMERO para imprimir log de succes o fail
-
-			// Wait a time between sending one message and the next one
-			time.Sleep(c.config.LoopPeriod)
+		}
+		return
+	default:
+		bet := BetData(c.config.ID)
+		if bet == nil {
+			return
 		}
 
+		client_message := FormatMessage(*bet)
+		if client_message == "" {
+			return
+		}
+
+		// Create the connection the server in every loop iteration. Send an
+		c.createClientSocket()
+
+		// TODO: Modify the send to avoid short-write
+		// fmt.Fprintf(
+		// 	c.conn,
+		// 	"[CLIENT %v] Message N°%v\n",
+		// 	c.config.ID,
+		// 	msgID,
+		// ) //en esta lectura tengo que asegurarme que tampoco haya short read de la rta del server
+		// msg, err := bufio.NewReader(c.conn).ReadString('\n')
+
+		if err := SendClientMessage(c.conn, client_message); err != nil {
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			c.conn.Close()
+			return
+		}
+
+		ack, err := RecieveServerAck(c.conn)
+		if err != nil {
+			log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			c.conn.Close()
+			return
+		}
+
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+
+		c.conn.Close()
+
+		server_ack := strings.Split(ack, "|")
+		ack_document, _ := strconv.Atoi(strings.TrimSpace(server_ack[0]))
+		ack_number, _ := strconv.Atoi(strings.TrimSpace(server_ack[1]))
+
+		client_document, _ := strconv.Atoi(c.bet.Document)
+		client_number, _ := strconv.Atoi(c.bet.Number)
+
+		if ack_document == client_document && ack_number == client_number {
+			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
+		} else {
+			log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
+		}
+		//EXTRAR CAMPOS ACK DEL SERVER: DOCUMENTO Y NUMERO para imprimir log de succes o fail
 	}
 }

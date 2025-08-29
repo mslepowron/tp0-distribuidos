@@ -2,6 +2,8 @@ import socket
 import logging
 import signal
 import sys
+from common import utils, messages
+
 
 
 class Server:
@@ -62,12 +64,25 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            # # TODO: Modify the receive to avoid short-reads
+            # msg = client_sock.recv(1024).rstrip().decode('utf-8')
+            # addr = client_sock.getpeername()
+            # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
+            # # TODO: Modify the send to avoid short-writes
+            # client_sock.send("{}\n".format(msg).encode('utf-8'))
+            
+            # decode cliet msg
+            message = messages.recieve_client_messasge(client_sock)
+            logging.info('action: recieved_client_message | result: succes | ip: {addr[0]} | msg: {msg}')
+            #save bet
+            bet = messages.decode_message(message)
+            utils.store_bets([bet])
+            #log save bet
+            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
+            #send ack
+            ack_str = "{}|{}\n".format(bet.document, bet.number)
+            ack_bytes = ack_str.encode("utf-8")
+            messages.send_ack_client(client_sock, ack_bytes)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
