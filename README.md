@@ -146,6 +146,6 @@ Si el cliente no recibe este mensaje de confirmación, se logguea el problema y 
   ./generar-compose.sh docker-compose-dev.yaml 1
   ```
   Luego se levanta el sistema con:
-    ```
+  ```
   make docker-compose-up
   ```

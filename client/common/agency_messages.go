@@ -21,6 +21,7 @@ type Bet struct {
 	Number    string
 }
 
+// BetData creates a Bet struct with the client's bet information stored in environment variables
 func BetData(clientID string) *Bet {
 
 	betName := os.Getenv("NOMBRE")
@@ -46,9 +47,7 @@ func BetData(clientID string) *Bet {
 	return bet
 }
 
-//Send bet info:
-//serialize bet data -> send to server -> wait for confirmation (log)
-
+// FormatMessage formats the client's bet data into a protocol the server understands
 func FormatMessage(bet Bet) string {
 
 	for _, field := range []string{bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number} {
@@ -67,6 +66,7 @@ func FormatMessage(bet Bet) string {
 	return msg
 }
 
+// WriteFull send all the data through the server connection while avoiding short-writes
 func WriteFull(connection net.Conn, data []byte) error {
 	totalWritten := 0
 	dataLength := len(data)
@@ -82,8 +82,7 @@ func WriteFull(connection net.Conn, data []byte) error {
 	return nil
 }
 
-// lo que se envia es un mensaje. No nos interesa en esta capa de comunicacion
-// si es una bet u otra cosa. Aca nos interesa el envio
+// SendClientMessage serializes the client data and sends it to the server
 func SendClientMessage(connection net.Conn, message string) error {
 
 	if len(message) > MaxMessageSize {
@@ -105,6 +104,8 @@ func SendClientMessage(connection net.Conn, message string) error {
 	return WriteFull(connection, messageBytes)
 }
 
+// RecieveServerAck read from the server connection de server response (ack) given to the
+// message sent by the client
 func RecieveServerAck(connection net.Conn) (string, error) {
 	reader := bufio.NewReader(connection)
 
@@ -124,6 +125,8 @@ func RecieveServerAck(connection net.Conn) (string, error) {
 	return msg, nil
 }
 
+// CheckServerAck compares the ack received from the server with the bet data to see if the information
+// was recieved correctly.
 func CheckServerAck(ack string, bet Bet) bool {
 	serverAck := strings.Split(ack, ";")
 
