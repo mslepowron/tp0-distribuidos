@@ -108,7 +108,7 @@ Docker va a enviar la señal ```SIGTERM```, y si los procesos saben manejarla, t
 
 ### Ejercicio 5
 
-Como planteo inicial se implentó un modulo _agency message_ para el cliente. Los datos de la apuesta se definen como variables de entorno, y se utilizan para construir un mensaje con el siguiente formato:
+Se implentó un modulo _agency message_ para el cliente. Los datos de la apuesta se definen como variables de entorno, y se utilizan para construir un mensaje con el siguiente formato:
 
  ``` go
 msg := fmt.Sprintf("%s;%s;%s;%s;%s;%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number) 
@@ -124,7 +124,7 @@ a secas no nos garantiza que se envíen todos los datos que queremos. Puede suce
 
 Para evitar que esto suceda, se tuvieron en cuenta dos cosas:
 
-Por un lado, establecer un limite de tamaño máximo de mensaje a enviar (8KB). Esto evita saturar el buffer del socket, aporta algo de robustez y seguridad (por ejemplo evitando que in cliente malicioso mande mesajes excesivamente grandes que saturen el servidor o provoquen un DoS), y aporta simplicidad; mantener mensajes de tamaño moderado facilita el manejo de buffers y control de errores.
+Por un lado, establecer un limite de tamaño máximo de mensaje a enviar (8KB). Esto evita saturar el buffer del socket, aporta algo de robustez y seguridad (por ejemplo evitando que un cliente malicioso mande mesajes excesivamente grandes que saturen el servidor o provoquen un DoS), y aporta simplicidad; mantener mensajes de tamaño moderado facilita el manejo de buffers y control de errores.
 
 Por otro lado, se implementó una función ```WriteFull()``` donde se repite la operación de escritura en un loop hasta que efectivamente se hallan enviado todos los bytes del mensaje, evitando el envío de mensajes incompletos.
 
@@ -134,7 +134,7 @@ Es decir, el protocolo esta conformado por 4 bytes (message length) + payload (c
 
 El cliente espera un mensaje de confirmación de parte del servidor para verificar que haya recibio correctamente los datos de la apuesta. Este mismo contiene los datos que presenta el log del server cuando persiste una apuesta correctamente; es decir, el DNI y el Numero del cliente.
 
-Si el cliente no recibe este mensaje de confirmación, retorna un error y logguea el problema.
+Si el cliente no recibe este mensaje de confirmación, se logguea el problema y tiene un maximo de 3 reintentos para conectarse al servidor y mandar los datos de la apuesta. Una vez agotados los 3 reintentos, se logguea un error final de fallo de envio del mensaje, y se finaliza el programa.
 
   **Uso:**  
   Se debe correr, desde la raiz del proyecto:
@@ -149,11 +149,3 @@ Si el cliente no recibe este mensaje de confirmación, retorna un error y loggue
     ```
   make docker-compose-up
   ```
-
-
-Ideas refactorizacion:
-  - que la serializacion del mensaje sea con un json (mas flexible, legible, no es necesario saber el orden de los campos, es una heraamienta comun entre todos los lenguajes etc)
-  - que si falla el envio del client se reintente (3 veces por ej) para + tolerancia a fallos; excepto que supere la capacidad maxima (eso igual creo q se puede resolver en el 6 con los chunks)
-  - uso de constantes para tamanos maximos, errores, etc.
-  - chequeo de errores terminales (si se cerro la conexion abortar y termina) ?
-  - chequear codigos de error correspondientes en cada caso

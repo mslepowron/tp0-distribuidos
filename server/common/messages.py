@@ -2,6 +2,9 @@ import socket
 import logging
 from common.utils import Bet
 
+MAX_MESSAGE_SIZE = 8192
+BET_FIELDS_COUNT = 6
+
 def recieve_full(client_sock: socket.socket, size: int) -> bytes:
     data = b""
     while len(data) < size:
@@ -15,7 +18,7 @@ def recieve_client_messasge(client_sock: socket.socket) -> str:
     length_bytes = recieve_full(client_sock, 4)
     message_length = int.from_bytes(length_bytes, "big")
 
-    if message_length > 8192:
+    if message_length > MAX_MESSAGE_SIZE:
         logging.error("action: recieve_client_message | result: fail | message is bigger than 8KB")
         raise ValueError("message is bigger than 8KB")
 
@@ -26,7 +29,7 @@ def recieve_client_messasge(client_sock: socket.socket) -> str:
 
 def decode_message(message: str) -> Bet:
     parts = message.split(";")
-    if len(parts) != 6:
+    if len(parts) != BET_FIELDS_COUNT:
         raise ValueError(f"Invalid bet format: {message}")
 
     agency, first_name, last_name, document, birthdate, number = parts

@@ -1,18 +1,15 @@
 package common
 
 import (
-	//"bufio"
-	//"fmt"
+	"github.com/op/go-logging"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
-
-	"github.com/op/go-logging"
 )
+
+const maxRetries = 3
 
 var log = logging.MustGetLogger("log")
 
@@ -59,8 +56,7 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
+
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 
@@ -82,56 +78,53 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
+		var ack string
+		var err error
 
-		// TODO: Modify the send to avoid short-write
-		// fmt.Fprintf(
-		// 	c.conn,
-		// 	"[CLIENT %v] Message N°%v\n",
-		// 	c.config.ID,
-		// 	msgID,
-		// ) //en esta lectura tengo que asegurarme que tampoco haya short read de la rta del server
-		// msg, err := bufio.NewReader(c.conn).ReadString('\n')
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			if err := c.createClientSocket(); err != nil {
+				log.Errorf("action: client_connect | result: fail | client_id: %v | attempt: %d/%d | error: %v",
+					c.config.ID, attempt, maxRetries,
+					err,
+				)
+				continue
+			}
 
-		if err := SendClientMessage(c.conn, client_message); err != nil {
-			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			c.conn.Close()
-			return
+			if err := SendClientMessage(c.conn, client_message); err != nil {
+				log.Errorf("action: send_message | result: fail | client_id: %v | attempt: %d/%d | error: %v",
+					c.config.ID, attempt, maxRetries,
+					err,
+				)
+				c.conn.Close()
+				continue
+			}
+
+			ack, err = RecieveServerAck(c.conn)
+			if err != nil {
+				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | attempt: %d/%d | error: %v", c.config.ID, attempt, maxRetries, err)
+				c.conn.Close()
+				time.Sleep(1 * time.Second) //sleep before next attempt
+				continue
+			}
+
+			break
 		}
 
-		ack, err := RecieveServerAck(c.conn)
 		if err != nil {
-			log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			c.conn.Close()
+			log.Criticalf("action: apuesta_enviada | result: fail | client_id: %v | error: could not send client message after %d retries",
+				c.config.ID, maxRetries)
+			if c.conn != nil {
+				c.conn.Close()
+			}
 			return
 		}
 
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-
-		server_ack := strings.Split(ack, ";")
-		ack_document, _ := strconv.Atoi(strings.TrimSpace(server_ack[0]))
-		ack_number, _ := strconv.Atoi(strings.TrimSpace(server_ack[1]))
-
-		client_document, _ := strconv.Atoi(c.bet.Document)
-		client_number, _ := strconv.Atoi(c.bet.Number)
-
-		if ack_document == client_document && ack_number == client_number {
+		if CheckServerAck(ack, c.bet) {
 			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
 		} else {
 			log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
 		}
 
 		c.conn.Close()
-		//EXTRAR CAMPOS ACK DEL SERVER: DOCUMENTO Y NUMERO para imprimir log de succes o fail
 	}
 }

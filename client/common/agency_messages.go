@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
-	// "github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
 )
+
+const MaxMessageSize = 8192
 
 type Bet struct {
 	AgencyId  string
@@ -50,8 +52,8 @@ func BetData(clientID string) *Bet {
 func FormatMessage(bet Bet) string {
 
 	for _, field := range []string{bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number} {
-		if field == "" || strings.Contains(field, "|") {
-			log.Critical("action: client_message_parser | result: fail | bet field cannot contain '|'")
+		if field == "" || strings.Contains(field, ";") {
+			log.Critical("action: client_message_parser | result: fail | bet field cannot contain ';'")
 			return ""
 		}
 		if field == "" {
@@ -84,7 +86,7 @@ func WriteFull(connection net.Conn, data []byte) error {
 // si es una bet u otra cosa. Aca nos interesa el envio
 func SendClientMessage(connection net.Conn, message string) error {
 
-	if len(message) > 8182 {
+	if len(message) > MaxMessageSize {
 		log.Critical("action: send_client_message | result: fail | message is bigger than 8KB")
 		return fmt.Errorf("message is bigger than 8KB")
 	}
@@ -120,4 +122,21 @@ func RecieveServerAck(connection net.Conn) (string, error) {
 	}
 
 	return msg, nil
+}
+
+func CheckServerAck(ack string, bet Bet) bool {
+	serverAck := strings.Split(ack, ";")
+
+	if len(serverAck) != 2 {
+		log.Errorf("action: check_server_ack | result: fail | invalid ack format")
+		return false
+	}
+
+	ackDocument, _ := strconv.Atoi(strings.TrimSpace(serverAck[0]))
+	ackNumber, _ := strconv.Atoi(strings.TrimSpace(serverAck[1]))
+
+	clientDocument, _ := strconv.Atoi(bet.Document)
+	clientNumber, _ := strconv.Atoi(bet.Number)
+
+	return ackDocument == clientDocument && ackNumber == clientNumber
 }
