@@ -1,12 +1,13 @@
 package common
 
 import (
-	"github.com/op/go-logging"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/op/go-logging"
 )
 
 const maxRetries = 3
@@ -15,25 +16,26 @@ var log = logging.MustGetLogger("log")
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
-	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
+	ID             string
+	ServerAddress  string
+	LoopAmount     int
+	LoopPeriod     time.Duration
+	BatchMaxAmount int
 }
 
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
-	bet    Bet
+	bets   []Bet
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig, bet Bet) *Client {
+func NewClient(config ClientConfig, bets []Bet) *Client {
 	client := &Client{
 		config: config,
-		bet:    bet,
+		bets:   bets,
 	}
 	return client
 }
@@ -68,61 +70,54 @@ func (c *Client) StartClientLoop() {
 		}
 		return
 	default:
-		bet := BetData(c.config.ID)
-		if bet == nil {
-			return
-		}
 
-		client_message := FormatMessage(*bet)
-		if client_message == "" {
-			return
-		}
+		c.createClientSocket()
 
-		var ack string
-		var err error
+		agencyBets := len(c.bets)
+		betCount := 0
 
-		for attempt := 1; attempt <= maxRetries; attempt++ {
-			if err := c.createClientSocket(); err != nil {
-				log.Errorf("action: client_connect | result: fail | client_id: %v | attempt: %d/%d | error: %v",
-					c.config.ID, attempt, maxRetries,
-					err,
-				)
-				continue
+		for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
+			end := i + c.config.BatchMaxAmount
+			if end > agencyBets {
+				end = agencyBets
 			}
 
-			if err := SendClientMessage(c.conn, client_message); err != nil {
-				log.Errorf("action: send_message | result: fail | client_id: %v | attempt: %d/%d | error: %v",
-					c.config.ID, attempt, maxRetries,
+			batch := c.bets[i:end]
+			betCount += len(batch)
+
+			message := FormatBatchMessage(batch, betCount)
+
+			if err := SendClientMessage(c.conn, message); err != nil {
+				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+					c.config.ID,
 					err,
 				)
 				c.conn.Close()
-				continue
+				return
 			}
-
-			ack, err = RecieveServerAck(c.conn)
-			if err != nil {
-				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | attempt: %d/%d | error: %v", c.config.ID, attempt, maxRetries, err)
-				c.conn.Close()
-				time.Sleep(1 * time.Second) //sleep before next attempt
-				continue
-			}
-
-			break
 		}
 
+		end_of_file_msg := FormatEndMessage(c.config.ID)
+		if err := SendClientMessage(c.conn, end_of_file_msg); err != nil {
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
+				c.config.ID,
+				err,
+			)
+			c.conn.Close()
+			return
+		}
+
+		ack, err := RecieveServerAck(c.conn)
 		if err != nil {
-			log.Criticalf("action: apuesta_enviada | result: fail | client_id: %v | error: could not send client message after %d retries",
-				c.config.ID, maxRetries)
-			if c.conn != nil {
-				c.conn.Close()
-			}
+			log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			c.conn.Close()
 			return
 		}
 
-		if CheckServerAck(ack, c.bet) {
-			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
+		if CheckBatchServerResponse(ack, agencyBets, c.config.ID) {
+			log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
 		} else {
-			log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v", c.bet.Document, c.bet.Number)
+			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
 		}
 
 		c.conn.Close()

@@ -104,7 +104,8 @@ Docker va a enviar la señal ```SIGTERM```, y si los procesos saben manejarla, t
   docker compose -f docker-compose-dev.yaml down -t 15
   ```
 
----
+
+## Parte 2
 
 ### Ejercicio 5
 
@@ -149,3 +150,29 @@ Si el cliente no recibe este mensaje de confirmación, se logguea el problema y 
   ```
   make docker-compose-up
   ```
+
+### Ejercicio 6
+
+Para el envío de apuestas en batch al servidor se modificó la función   ```StartClientLoop()``` de tal forma que en lugar de formatear y enviar la apuesta de un cliente, se realiza una lectura del archivo csv de la agencia correspondiente al Id, se almacenan todas las apuestas de esa agencia y se las va enviando al server en chunks del tamaño MaxAmount que se encuentra especificado en el archivo de configuración del cliente.
+
+De las apuestas correspondientes a la agencia, se van tomando chunks del tamaño batch configurado y se llama a ```FormatBatchMessage()``` para configurar el formato del mensaje que se enviará al servidor.
+
+Se conserva el protocolo desarrollado en el ejercicio 5, y se definió que la separación de las diferentes apuestas que se envian en el batch se identifiquen con un ```\n```
+
+Cuando finaliza el proceso de envío por batch, el cliente envía un último mensaje al server con el siguiente formato:
+
+```END_OF_FILE;<agencyID>```
+
+Indicando que ha finalizado el envío de datos de sus apuestas, y que corresponden a ese Id de agencia.
+
+El server procesa los datos recibidos y almacena las apuestas. En caso de que haya recibido exitosamente toda la información del archivo de la agencia, contesta con un ack al cliente, con la siguiente información:
+
+```<countOfBets>;<agencyID>```
+
+Le adjunta la cantidad de apuestas que almacenó correctamente, y el Id de esa agencia. 
+
+Si la cantidad de apuestas recibia en el ack del server coincide con la cantidad de apuestas totales de esa agencia, la agencia logguea:
+
+```go
+log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", <agencyID>, agencyBets)
+```

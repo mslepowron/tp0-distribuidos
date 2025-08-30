@@ -3,6 +3,7 @@ package common
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/csv"
 	"fmt"
 	"net"
 	"os"
@@ -47,6 +48,43 @@ func BetData(clientID string) *Bet {
 	return bet
 }
 
+// ReadAgencyBets reads the bets from a CSV file and returns a slice of Bet structs
+func ReadAgencyBets(agencyId string) ([]Bet, error) {
+	file, err := os.Open("agency.csv") //lo saca de la config del docker compose (volume)
+
+	if err != nil {
+		return nil, fmt.Errorf("action: read_agency_file | result: fail | error: %v", err)
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.Comma = ','
+
+	lines, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("action: read_agency_file | result: fail | error: reading CSV: %v", err)
+	}
+
+	var bets []Bet
+	for _, line := range lines {
+		if len(line) != 5 {
+			return nil, fmt.Errorf("action: read_agency_file | result: fail | error: invalid csv format at line %v", line)
+		}
+
+		bet := Bet{
+			AgencyId:  agencyId,
+			Name:      line[0],
+			LastName:  line[1],
+			Document:  line[2],
+			BirthDate: line[3],
+			Number:    line[4],
+		}
+		bets = append(bets, bet)
+	}
+
+	return bets, nil
+}
+
 // FormatMessage formats the client's bet data into a protocol the server understands
 func FormatMessage(bet Bet) string {
 
@@ -64,6 +102,26 @@ func FormatMessage(bet Bet) string {
 	msg := fmt.Sprintf("%s;%s;%s;%s;%s;%s", bet.AgencyId, bet.Name, bet.LastName, bet.Document, bet.BirthDate, bet.Number)
 
 	return msg
+}
+
+// FormatBatchMessage formats an agency bets data in a range of N bets, according
+// to de batch size. It uses the same format as FormatMessage (established protocol with
+// the server) and uses a delimiter to separate different bets.
+func FormatBatchMessage(bets []Bet, betCount int) string {
+	bets_string := make([]string, 0, len(bets))
+
+	for _, bet := range bets {
+		bet_message := FormatMessage(bet)
+		bets_string = append(bets_string, bet_message)
+	}
+
+	agency_bets_message := strings.Join(bets_string, "\n")
+
+	return agency_bets_message
+}
+
+func FormatEndMessage(agencyId string) string {
+	return fmt.Sprintf("END_OF_FILE;%s", agencyId)
 }
 
 // WriteFull send all the data through the server connection while avoiding short-writes
@@ -142,4 +200,20 @@ func CheckServerAck(ack string, bet Bet) bool {
 	clientNumber, _ := strconv.Atoi(bet.Number)
 
 	return ackDocument == clientDocument && ackNumber == clientNumber
+}
+
+func CheckBatchServerResponse(ack string, betCount int, agencyId string) bool {
+	serverAck := strings.Split(ack, ";")
+
+	if len(serverAck) != 2 {
+		log.Errorf("action: check_server_ack | result: fail | invalid ack format")
+		return false
+	}
+
+	ackBetsAmount, _ := strconv.Atoi(strings.TrimSpace(serverAck[0]))
+	ackAgencyID, _ := strconv.Atoi(strings.TrimSpace(serverAck[1]))
+
+	agencyIDInt, _ := strconv.Atoi(agencyId)
+
+	return ackBetsAmount == betCount && ackAgencyID == agencyIDInt
 }
