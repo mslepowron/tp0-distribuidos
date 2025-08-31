@@ -159,13 +159,15 @@ De las apuestas correspondientes a la agencia, se van tomando chunks del tamaño
 
 Se conserva el protocolo desarrollado en el ejercicio 5, y se definió que la separación de las diferentes apuestas que se envian en el batch se identifiquen con un ```\n```
 
+por cada batch enviado, el server logguea el proceso y le envia un ack al cliente, que puede ser de tipo ```BATCH_OK``` si todas las apuestas del batch se procesaron y almacenaron correctamente, o ```ERROR_BATCH``` si falló alguna. Para el primer caso, el cliente continua enviando el siguiente batch, y para el segundo caso, se corta la ejecución y se cierra la conexión.
+
 Cuando finaliza el proceso de envío por batch, el cliente envía un último mensaje al server con el siguiente formato:
 
 ```END_OF_FILE;<agencyID>```
 
 Indicando que ha finalizado el envío de datos de sus apuestas, y que corresponden a ese Id de agencia.
 
-El server procesa los datos recibidos y almacena las apuestas. En caso de que haya recibido exitosamente toda la información del archivo de la agencia, contesta con un ack al cliente, con la siguiente información:
+El server procesa los datos recibidos y almacena las apuestas. En caso de que haya recibido exitosamente toda la información del archivo de la agencia, contesta con un ack final al cliente, con la siguiente información:
 
 ```<countOfBets>;<agencyID>```
 
@@ -174,5 +176,19 @@ Le adjunta la cantidad de apuestas que almacenó correctamente, y el Id de esa a
 Si la cantidad de apuestas recibia en el ack del server coincide con la cantidad de apuestas totales de esa agencia, la agencia logguea:
 
 ```go
-log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", <agencyID>, agencyBets)
+log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, agencyBets)
 ```
+
+  **Uso:**  
+  Se debe correr, desde la raiz del proyecto:
+  ```
+  ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
+  ```
+  por ejemplo:
+  ```
+  ./generar-compose.sh docker-compose-dev.yaml 1
+  ```
+  Luego se levanta el sistema con:
+  ```
+  make docker-compose-up
+  ```

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -69,19 +70,13 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 
-	defer func() {
-		if c.conn != nil {
-			c.conn.Close()
-		}
-	}()
+	defer c.closeConnection()
 
 	for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
 		select {
 		case <-sigChannel:
 			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-			if c.conn != nil {
-				c.conn.Close()
-			}
+			c.closeConnection()
 			return
 		default:
 			end := i + c.config.BatchMaxAmount
@@ -92,31 +87,14 @@ func (c *Client) StartClientLoop() {
 			batch := c.bets[i:end]
 			betCount += len(batch)
 
-			message := FormatBatchMessage(batch, betCount)
-
-			if err := SendClientMessage(c.conn, message); err != nil {
-				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+			err := c.sendBatch(batch, betCount)
+			if err != nil {
+				log.Errorf(
+					"action: batch_failed | result: fail | client_id: %v | error: %v",
 					c.config.ID,
 					err,
 				)
 				return
-			}
-
-			ack, err := RecieveServerAck(c.conn)
-			if err != nil {
-				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
-					c.config.ID, err)
-				return
-			}
-
-			success, batchSize := CheckBatchServerResponse(ack)
-			if !success {
-				log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v",
-					c.config.ID, batchSize)
-				return
-			} else {
-				log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
-					c.config.ID, batchSize)
 			}
 
 			time.Sleep(c.config.LoopPeriod)
@@ -124,12 +102,49 @@ func (c *Client) StartClientLoop() {
 
 	}
 
+	c.sendEndOfFile(agencyBets)
+
+}
+
+// closeConnection closes the client connection
+func (c *Client) closeConnection() {
+	if c.conn != nil {
+		c.conn.Close()
+	}
+}
+
+// sendBatch sends a batch of the agency's bets to the server and checks the server response
+func (c *Client) sendBatch(batch []Bet, betCount int) error {
+	message := FormatBatchMessage(batch, betCount)
+
+	if err := SendClientMessage(c.conn, message); err != nil {
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return fmt.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+	}
+
+	ack, err := RecieveServerAck(c.conn)
+	if err != nil {
+		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return fmt.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+	}
+
+	success, batchSize := CheckBatchServerResponse(ack)
+	if success {
+		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, batchSize)
+	} else {
+		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, batchSize)
+		return fmt.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, batchSize)
+	}
+
+	return nil
+}
+
+// sendEndOfFile sends a message to the server indicating all bets in the agency file were sent. It
+// waits for a server final response to check all the bets were stored.
+func (c *Client) sendEndOfFile(totalBets int) {
 	endOfFileMsg := FormatEndMessage(c.config.ID)
 	if err := SendClientMessage(c.conn, endOfFileMsg); err != nil {
-		log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
-			c.config.ID,
-			err,
-		)
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch %v", c.config.ID, err)
 		return
 	}
 
@@ -139,10 +154,9 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 
-	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
-		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
+	if CheckEndServerResponse(ack, totalBets, c.config.ID) {
+		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, totalBets)
 	} else {
-		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
+		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, totalBets)
 	}
-
 }
