@@ -120,6 +120,34 @@ func FormatBatchMessage(bets []Bet, betCount int) string {
 	return agency_bets_message
 }
 
+func FormatBatches(bets []Bet, maxBatchSize int) []string{
+	var messages []string
+    var currentBatch []string
+    currentSize := 0
+
+	for _, bet := range bets {
+        betMsg := FormatMessage(bet)
+        betSize := len(betMsg) + 1
+
+        
+        if len(currentBatch) > 0 && 
+           (len(currentBatch) >= maxBatchSize || currentSize+betSize > MaxMessageSize) {
+            messages = append(messages, strings.Join(currentBatch, "\n"))
+            currentBatch = []string{}
+            currentSize = 0
+        }
+
+        currentBatch = append(currentBatch, betMsg)
+        currentSize += betSize
+    }
+
+    if len(currentBatch) > 0 {
+        messages = append(messages, strings.Join(currentBatch, "\n"))
+    }
+
+    return messages
+}
+
 func FormatEndMessage(agencyId string) string {
 	return fmt.Sprintf("END_OF_FILE;%s", agencyId)
 }
