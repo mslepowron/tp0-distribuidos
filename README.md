@@ -151,6 +151,8 @@ Si el cliente no recibe este mensaje de confirmación, se logguea el problema y 
   make docker-compose-up
   ```
 
+---
+
 ### Ejercicio 6
 
 Para el envío de apuestas en batch al servidor se modificó la función   ```StartClientLoop()``` de tal forma que en lugar de formatear y enviar la apuesta de un cliente, se realiza una lectura del archivo csv de la agencia correspondiente al Id, se almacenan todas las apuestas de esa agencia y se las va enviando al server en chunks del tamaño MaxAmount que se encuentra especificado en el archivo de configuración del cliente.
@@ -192,3 +194,5 @@ log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, 
   ```
   make docker-compose-up
   ```
+
+---

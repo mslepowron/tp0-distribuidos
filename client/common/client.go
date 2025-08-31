@@ -92,64 +92,36 @@ func (c *Client) StartClientLoop() {
 			batch := c.bets[i:end]
 			betCount += len(batch)
 
-			// message := FormatBatchMessage(batch, betCount)
+			message := FormatBatchMessage(batch, betCount)
 
 
-			// if err := SendClientMessage(c.conn, message); err != nil {
-			// 	log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-			// 		c.config.ID,
-			// 		err,
-			// 	)
-			// 	return
-			// }
-
-			// ack, err := RecieveServerAck(c.conn)
-			// if err != nil {
-			// 	log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
-			// 		c.config.ID, err)
-			// 	return
-			// }
-
-			// success, batchSize := CheckBatchServerResponse(ack)
-			// if !success {
-			// 	log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v",
-			// 		c.config.ID, batchSize)
-			// 	return
-			// } else {
-			// 	log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
-			// 		c.config.ID, batchSize)
-			// }
-
-			// time.Sleep(c.config.LoopPeriod)
-
-			batch_messages := FormatBatches(batch, c.config.BatchMaxAmount)
-
-			for _, message := range batch_messages {
-				if err := SendClientMessage(c.conn, message); err != nil {
-					log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-						c.config.ID, err)
-					return
-				}
-
-				ack, err := RecieveServerAck(c.conn)
-				if err != nil {
-					log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
-						c.config.ID, err)
-					return
-				}
-
-				success, batchSize := CheckBatchServerResponse(ack)
-				if !success {
-					log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v",
-						c.config.ID, batchSize)
-					return
-				} else {
-					log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
-						c.config.ID, batchSize)
-				}
-
-				time.Sleep(c.config.LoopPeriod)
+			if err := SendClientMessage(c.conn, message); err != nil {
+				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+					c.config.ID,
+					err,
+				)
+				return
 			}
+
+			ack, err := RecieveServerAck(c.conn)
+			if err != nil {
+				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
+					c.config.ID, err)
+				return
+			}
+
+			success, batchSize := CheckBatchServerResponse(ack)
+			if !success {
+				log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v",
+					c.config.ID, batchSize)
+				return
+			} else {
+				log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
+					c.config.ID, batchSize)
+			}
+
+			time.Sleep(c.config.LoopPeriod)
+	
 		}
 
 	}
