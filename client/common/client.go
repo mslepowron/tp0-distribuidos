@@ -58,12 +58,11 @@ func (c *Client) createClientSocket() error {
 
 func (c *Client) StartClientLoop() {
 
+	var err error = nil
+	
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
-
-	agencyBets := len(c.bets)
-	betCount := 0
-
+	
 	if err := c.createClientSocket(); err != nil {
 		return
 	}
@@ -74,15 +73,42 @@ func (c *Client) StartClientLoop() {
 		}
 	}()
 	
+	err = c.SendClientBets(sigChannel)
+	if err != nil {
+		return
+	}
+	
+	err = c.SendEndOfBetsMessage(sigChannel)
+	if err != nil{
+		return
+	}
+
+	ack, err := RecieveServerAck(c.conn)
+	if err != nil {
+		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
+
+	agencyBets := len(c.bets)
+
+	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
+		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
+	} else {
+		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
+	}
+
+}
+
+//SendClientBets sends all bets in agency file in batches to the server
+func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
+	agencyBets := len(c.bets)
+	betCount := 0
 
 	for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
 		select {
 		case <-sigChannel:
 			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-			if c.conn != nil {
-				c.conn.Close()
-			}
-			return
+			return fmt.Errorf("client_shutdown")  //es para que entre en el defer cierre y salga
 		default:
 			end := i + c.config.BatchMaxAmount
 			if end > agencyBets {
@@ -100,21 +126,21 @@ func (c *Client) StartClientLoop() {
 					c.config.ID,
 					err,
 				)
-				return
+				return fmt.Errorf("send message failed: %w", err)
 			}
 
 			ack, err := RecieveServerAck(c.conn)
 			if err != nil {
 				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
 					c.config.ID, err)
-				return
+				return fmt.Errorf("receive server ack failed: %w", err)
 			}
 
 			success, batchSize := CheckBatchServerResponse(ack)
 			if !success {
 				log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v",
 					c.config.ID, batchSize)
-				return
+				return fmt.Errorf("batch failed at size %v", batchSize)
 			} else {
 				log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
 					c.config.ID, batchSize)
@@ -125,26 +151,25 @@ func (c *Client) StartClientLoop() {
 		}
 
 	}
+	return nil
+}
 
-	endOfFileMsg := FormatEndMessage(c.config.ID)
-	if err := SendClientMessage(c.conn, endOfFileMsg); err != nil {
-		log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
-			c.config.ID,
-			err,
-		)
-		return
+//SendEndOfBetsMessage sends the end of bets message to the server to notify the whole file has been sent
+func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
+	select {
+	case <-sigChannel:
+		log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
+		return fmt.Errorf("client_shutdown")
+	default:
+		endOfFileMsg := FormatEndMessage(c.config.ID)
+		if err := SendClientMessage(c.conn, endOfFileMsg); err != nil {
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
+				c.config.ID,
+				err,
+			)
+			return fmt.Errorf("error sending end of bets file message")
+		}
 	}
 
-	ack, err := RecieveServerAck(c.conn)
-	if err != nil {
-		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return
-	}
-
-	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
-		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
-	} else {
-		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
-	}
-
+	return nil
 }
