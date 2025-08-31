@@ -196,3 +196,5 @@ log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, 
   ```
 
 ---
+
+### Ejercicio 7
