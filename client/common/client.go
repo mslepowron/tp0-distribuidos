@@ -62,21 +62,21 @@ func (c *Client) StartClientLoop() {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 
-	select {
-	case <-sigChannel:
-		log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-		if c.conn != nil {
-			c.conn.Close()
-		}
-		return
-	default:
+	agencyBets := len(c.bets)
+	betCount := 0
 
-		c.createClientSocket()
+	c.createClientSocket()
 
-		agencyBets := len(c.bets)
-		betCount := 0
+	for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
+		select {
+		case <-sigChannel:
+			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
+			if c.conn != nil {
+				c.conn.Close()
+			}
+			return
+		default:
 
-		for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
 			end := i + c.config.BatchMaxAmount
 			if end > agencyBets {
 				end = agencyBets
@@ -92,34 +92,36 @@ func (c *Client) StartClientLoop() {
 					c.config.ID,
 					err,
 				)
-				c.conn.Close()
+				//c.conn.Close()
 				return
 			}
 		}
-
-		end_of_file_msg := FormatEndMessage(c.config.ID)
-		if err := SendClientMessage(c.conn, end_of_file_msg); err != nil {
-			log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
-				c.config.ID,
-				err,
-			)
-			c.conn.Close()
-			return
-		}
-
-		ack, err := RecieveServerAck(c.conn)
-		if err != nil {
-			log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			c.conn.Close()
-			return
-		}
-
-		if CheckBatchServerResponse(ack, agencyBets, c.config.ID) {
-			log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
-		} else {
-			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
-		}
-
-		c.conn.Close()
+		time.Sleep(c.config.LoopPeriod)
 	}
+
+	end_of_file_msg := FormatEndMessage(c.config.ID)
+	if err := SendClientMessage(c.conn, end_of_file_msg); err != nil {
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
+			c.config.ID,
+			err,
+		)
+		//c.conn.Close()
+		return
+	}
+
+	ack, err := RecieveServerAck(c.conn)
+	if err != nil {
+		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		//c.conn.Close()
+		return
+	}
+
+	if CheckBatchServerResponse(ack, agencyBets, c.config.ID) {
+		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
+		c.conn.Close()
+	} else {
+		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
+	}
+
+	//c.conn.Close()
 }

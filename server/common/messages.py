@@ -1,5 +1,6 @@
 import socket
 import logging
+from typing import List
 from common.utils import Bet
 
 MAX_MESSAGE_SIZE = 8192
@@ -59,3 +60,30 @@ def send_ack_client(client_sock: socket.socket, ack: bytes) -> None:
         if sent == 0:
             raise RuntimeError("Conexión cerrada mientras se enviaba ACK")
         total_sent += sent
+
+
+def is_end_of_agency_file(message: str):
+    if message.startswith("END_OF_FILE;"):
+        parts = message.split(";")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid END_OF_FILE message: {message}")
+        is_eof = True
+        agency_id = parts[1]
+    else:
+        is_eof = False
+        agency_id = ""
+    
+    return is_eof, agency_id
+
+def decode_batch_bets(batch_message: str) -> List[Bet]:
+    """
+    Decodes a batch message containing multiple bets separated by \n.
+    Procceses each bet using the decode_message in order to store it.
+    """
+    bets = []
+    lines = batch_message.strip().split("\n")
+    for line in lines:
+        if line.strip():
+            bet = decode_message(line)
+            bets.append(bet)
+    return bets

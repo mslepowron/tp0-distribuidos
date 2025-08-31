@@ -62,20 +62,27 @@ class Server:
         client socket will also be closed
         """
         try:
-            
-            # decode cliet msg
-            message = messages.recieve_client_messasge(client_sock)
-            addr = client_sock.getpeername()
-            logging.info(f'action: recieved_client_message | result: success | ip: {addr[0]} | msg: {message}')
-            #save bet
-            bet = messages.decode_message(message)
-            utils.store_bets([bet])
-            #log save bet
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
-            #send ack
-            ack_str = "{};{}\n".format(bet.document, bet.number)
-            ack_bytes = ack_str.encode("utf-8")
-            messages.send_ack_client(client_sock, ack_bytes)
+            agency_bets = 0
+            end_batch_read = False
+
+            while not end_batch_read:
+                message = messages.recieve_client_messasge(client_sock)
+
+                # addr = client_sock.getpeername()
+                # logging.info(f'action: recieved_client_message | result: success | ip: {addr[0]} | msg: {message}')
+
+                is_eof, agency_id = messages.is_end_of_agency_file(message)
+                if is_eof:
+                    end_batch_read = True
+                    logging.info(f"action: apuesta_recibida | result: success | cantidad: {agency_bets}")
+                    
+                    ack_str = "{};{}\n".format(agency_bets, agency_id)
+                    ack_bytes = ack_str.encode("utf-8")
+                    messages.send_ack_client(client_sock, ack_bytes)
+                else:
+                    bets = messages.decode_batch_bets(message)
+                    utils.store_bets(bets)
+                    agency_bets += len(bets)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
