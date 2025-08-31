@@ -63,6 +63,10 @@ def send_ack_client(client_sock: socket.socket, ack: bytes) -> None:
 
 
 def is_end_of_agency_file(message: str):
+    """""
+    Checks if the client sent a message indicating the end of the bets file,
+    and that it has no more batches to send.
+    """""
     if message.startswith("END_OF_FILE;"):
         parts = message.split(";")
         if len(parts) != 2:

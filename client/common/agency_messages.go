@@ -202,7 +202,8 @@ func CheckServerAck(ack string, bet Bet) bool {
 	return ackDocument == clientDocument && ackNumber == clientNumber
 }
 
-func CheckBatchServerResponse(ack string, betCount int, agencyId string) bool {
+// CheckEndServerResponse checks the server response to the END_OF_FILE message
+func CheckEndServerResponse(ack string, betCount int, agencyId string) bool {
 	serverAck := strings.Split(ack, ";")
 
 	if len(serverAck) != 2 {
@@ -216,4 +217,27 @@ func CheckBatchServerResponse(ack string, betCount int, agencyId string) bool {
 	agencyIDInt, _ := strconv.Atoi(agencyId)
 
 	return ackBetsAmount == betCount && ackAgencyID == agencyIDInt
+}
+
+// CheckBatchServerResponse checks the server response to a batch message
+func CheckBatchServerResponse(ack string) (success bool, batchSize int) {
+
+	ack = strings.TrimSpace(ack)
+	serverAck := strings.Split(ack, ";")
+	if strings.HasPrefix(ack, "BATCH_OK") {
+		success = true
+		if len(serverAck) == 2 {
+			batchSize, _ = strconv.Atoi(strings.TrimSpace(serverAck[1]))
+		}
+	} else if strings.HasPrefix(ack, "ERROR_BATCH") {
+		success = false
+		if len(serverAck) == 2 {
+			batchSize, _ = strconv.Atoi(strings.TrimSpace(serverAck[1]))
+		}
+	} else {
+		// EOF o cualquier otro caso
+		success = true // o false según lo que quieras manejar
+		batchSize = 0
+	}
+	return
 }

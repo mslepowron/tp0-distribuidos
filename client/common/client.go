@@ -65,7 +65,15 @@ func (c *Client) StartClientLoop() {
 	agencyBets := len(c.bets)
 	betCount := 0
 
-	c.createClientSocket()
+	if err := c.createClientSocket(); err != nil {
+		return
+	}
+
+	defer func() {
+		if c.conn != nil {
+			c.conn.Close()
+		}
+	}()
 
 	for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
 		select {
@@ -76,7 +84,6 @@ func (c *Client) StartClientLoop() {
 			}
 			return
 		default:
-
 			end := i + c.config.BatchMaxAmount
 			if end > agencyBets {
 				end = agencyBets
@@ -92,36 +99,50 @@ func (c *Client) StartClientLoop() {
 					c.config.ID,
 					err,
 				)
-				//c.conn.Close()
 				return
 			}
+
+			ack, err := RecieveServerAck(c.conn)
+			if err != nil {
+				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
+					c.config.ID, err)
+				return
+			}
+
+			success, batchSize := CheckBatchServerResponse(ack)
+			if !success {
+				log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v",
+					c.config.ID, batchSize)
+				return
+			} else {
+				log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
+					c.config.ID, batchSize)
+			}
+
+			time.Sleep(c.config.LoopPeriod)
 		}
-		time.Sleep(c.config.LoopPeriod)
+
 	}
 
-	end_of_file_msg := FormatEndMessage(c.config.ID)
-	if err := SendClientMessage(c.conn, end_of_file_msg); err != nil {
+	endOfFileMsg := FormatEndMessage(c.config.ID)
+	if err := SendClientMessage(c.conn, endOfFileMsg); err != nil {
 		log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send end of batch sending to server %v",
 			c.config.ID,
 			err,
 		)
-		//c.conn.Close()
 		return
 	}
 
 	ack, err := RecieveServerAck(c.conn)
 	if err != nil {
 		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		//c.conn.Close()
 		return
 	}
 
-	if CheckBatchServerResponse(ack, agencyBets, c.config.ID) {
+	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
 		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
-		c.conn.Close()
 	} else {
 		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
 	}
 
-	//c.conn.Close()
 }

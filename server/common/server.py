@@ -68,23 +68,33 @@ class Server:
             while not end_batch_read:
                 message = messages.recieve_client_messasge(client_sock)
 
-                # addr = client_sock.getpeername()
-                # logging.info(f'action: recieved_client_message | result: success | ip: {addr[0]} | msg: {message}')
-
                 is_eof, agency_id = messages.is_end_of_agency_file(message)
                 if is_eof:
                     end_batch_read = True
-                    logging.info(f"action: apuesta_recibida | result: success | cantidad: {agency_bets}")
+                    logging.info(f"action: procesamiento_apuestas_cliente | result: success | cantidad: {agency_bets}")
                     
                     ack_str = "{};{}\n".format(agency_bets, agency_id)
                     ack_bytes = ack_str.encode("utf-8")
                     messages.send_ack_client(client_sock, ack_bytes)
                 else:
-                    bets = messages.decode_batch_bets(message)
-                    utils.store_bets(bets)
-                    agency_bets += len(bets)
+                    try:
+                        bets = messages.decode_batch_bets(message)
+                        utils.store_bets(bets)
+                        logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
+                        agency_bets += len(bets)
+
+                        ack_str = "BATCH_OK;{}\n".format(len(bets))
+                        ack_bytes = ack_str.encode("utf-8")
+                        messages.send_ack_client(client_sock, ack_bytes)
+                    except Exception as e:
+                        batch_size = len(bets)
+                        logging.error(f"action: apuesta_recibida | result: fail | cantidad: {batch_size}")
+
+                        ack_str = "ERROR_BATCH;{}\n".format(batch_size)
+                        ack_bytes = ack_str.encode("utf-8")
+                        messages.send_ack_client(client_sock, ack_bytes)
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
             if client_sock in self.client_sockets:
