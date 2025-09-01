@@ -104,6 +104,10 @@ func FormatMessage(bet Bet) string {
 	return msg
 }
 
+func FormatBetSendingMessage() string {
+	return "BETS"
+}
+
 // FormatBatchMessage formats an agency bets data in a range of N bets, according
 // to de batch size. It uses the same format as FormatMessage (established protocol with
 // the server) and uses a delimiter to separate different bets.
@@ -125,6 +129,8 @@ func FormatEndMessage(agencyId string) string {
 	return fmt.Sprintf("END_OF_FILE;%s", agencyId)
 }
 
+// FormatWinnerConsult creates the LOTERY_WINNER message to request the lottery results from the server for
+// a specific agency
 func FormatWinnerConsult(agencyId string) string {
 	return fmt.Sprintf("LOTERY_WINNER;%s", agencyId)
 }

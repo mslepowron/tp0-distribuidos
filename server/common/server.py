@@ -65,54 +65,62 @@ class Server:
         client socket will also be closed
         """
         try:
-            agency_bets = 0
-            
-
-            while True:
-                message = messages.recieve_client_messasge(client_sock)
-
-                is_eof, agency_id = messages.is_end_of_agency_file(message)
-                if is_eof:
-                    self.client_completed_send[agency_id] = True
-                    logging.info(f"action: procesamiento_apuestas_cliente | result: success | agency: {agency_id} | cantidad: {agency_bets}")
+            message = messages.recieve_client_messasge(client_sock)
+            if message == "BETS":
+                agency_bets = 0
+                while True:
+                    message = messages.recieve_client_messasge(client_sock)
                     
-                    if len(self.client_completed_send) == TOTAL_AGENCIES and not self.lottery_finished:
-                        self.lottery_finished = True
-                        self.__process_lottery_winners()
-                        logging.info(f'action: sorteo | result: success')
-                if message.startswith("LOTERY_WINNER;"):
-                    agency_id = message.split(";")[1]
-                    if self.lottery_finished:
-                        winners = self.client_winners.get(agency_id, [])
-                        response_winners = "WINNERS;" + ";".join(winners) + "\n"
-                        messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
+                    is_eof, agency_id = messages.is_end_of_agency_file(message)
+                    if is_eof:
+                    
+                        logging.info(f"action: apuesta_recibida | result: success | cantidad: {agency_bets}")
+                        
+                        ack_str = "{};{}\n".format(agency_bets, agency_id)
+                        ack_bytes = ack_str.encode("utf-8")
+                        messages.send_ack_client(client_sock, ack_bytes)
+
+                        self.client_completed_send[agency_id] = True
+
+                        if len(self.client_completed_send) == TOTAL_AGENCIES and not self.lottery_finished:
+                          self.lottery_finished = True
+                          self.__process_lottery_winners()
+                          logging.info(f'action: sorteo | result: success')
+
+                        break
                     else:
-                        response_error = "ERROR_LOTERY_RESPONSE\n"
-                        messages.send_ack_client(client_sock, response_error.encode("utf-8"))
-                    continue
+                        try:
+                            bets = messages.decode_batch_bets(message)
+                            utils.store_bets(bets)
+                            logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
+                            agency_bets += len(bets)
+
+                            ack_str = "BATCH_OK;{}\n".format(len(bets))
+                            ack_bytes = ack_str.encode("utf-8")
+                            messages.send_ack_client(client_sock, ack_bytes)
+                        except Exception as e:
+                            batch_size = len(bets)
+                            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {batch_size}")
+
+                            ack_str = "ERROR_BATCH;{}\n".format(batch_size)
+                            ack_bytes = ack_str.encode("utf-8")
+                            messages.send_ack_client(client_sock, ack_bytes)
+            if message.startswith("LOTERY_WINNER;"):
+                agency_id = message.split(";")[1]
+                if self.lottery_finished:
+                    winners = self.client_winners.get(agency_id, [])
+                    response_winners = "WINNERS;" + ";".join(winners) + "\n"
+                    messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
                 else:
-                    try:
-                        bets = messages.decode_batch_bets(message)
-                        utils.store_bets(bets)
-                        logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
-                        agency_bets += len(bets)
-
-                        ack_str = "BATCH_OK;{}\n".format(len(bets))
-                        ack_bytes = ack_str.encode("utf-8")
-                        messages.send_ack_client(client_sock, ack_bytes)
-                    except Exception as e:
-                        batch_size = len(bets)
-                        logging.error(f"action: apuesta_recibida | result: fail | cantidad: {batch_size}")
-
-                        ack_str = "ERROR_BATCH;{}\n".format(batch_size)
-                        ack_bytes = ack_str.encode("utf-8")
-                        messages.send_ack_client(client_sock, ack_bytes)
+                    response_error = "ERROR_LOTERY_RESPONSE\n"
+                    messages.send_ack_client(client_sock, response_error.encode("utf-8"))
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
             if client_sock in self.client_sockets:
                 self.client_sockets.remove(client_sock)
+
 
     def __accept_new_connection(self):
         """
@@ -133,7 +141,8 @@ class Server:
         loads de agencys bets and uses has_won to calculate the
         agency's winners
         """
-        all_bets = utils.load_bets()
+        all_bets = list(utils.load_bets())
         for agency_id in self.client_completed_send:
-            winners = [bet.document for bet in all_bets if bet.agency == agency_id and utils.has_won(bet)]
+            agency_int = int(agency_id)
+            winners = [bet.document for bet in all_bets if bet.agency == agency_int and utils.has_won(bet)]
             self.client_winners[agency_id] = winners

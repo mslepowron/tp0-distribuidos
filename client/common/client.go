@@ -74,6 +74,16 @@ func (c *Client) StartClientLoop() {
 		}
 	}()
 
+	message := FormatBetSendingMessage()
+
+	if err := SendClientMessage(c.conn, message); err != nil {
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+
 	err = c.SendClientBets(sigChannel)
 	if err != nil {
 		return
@@ -83,22 +93,22 @@ func (c *Client) StartClientLoop() {
 	if err != nil {
 		return
 	}
-	/*
-		ack, err := RecieveServerAck(c.conn)
-		if err != nil {
-			log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			return
-		}
 
-		agencyBets := len(c.bets)
+	ack, err := RecieveServerAck(c.conn)
+	if err != nil {
+		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
 
-		if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
-			log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
-		} else {
-			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
-			return
-		}
-	*/
+	agencyBets := len(c.bets)
+
+	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
+		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
+	} else {
+		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
+		return
+	}
+
 	c.conn.Close()
 
 	err = c.WaitForLoteryResults(sigChannel)
@@ -133,14 +143,14 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 					c.config.ID,
 					err,
 				)
-				return fmt.Errorf("send message failed: %w", err)
+				return fmt.Errorf("could not send bet batch: %w", err)
 			}
 
 			ack, err := RecieveServerAck(c.conn)
 			if err != nil {
 				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
 					c.config.ID, err)
-				return fmt.Errorf("receive server ack failed: %w", err)
+				return fmt.Errorf("receive server ack failed for client batch sending: %w", err)
 			}
 
 			success, batchSize := CheckBatchServerResponse(ack)
@@ -153,7 +163,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 					c.config.ID, batchSize)
 			}
 
-			time.Sleep(c.config.LoopPeriod)
+			//time.Sleep(c.config.LoopPeriod)
 
 		}
 
@@ -181,7 +191,7 @@ func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
 }
 
 func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
-
+	sleepTimer := 200 * time.Millisecond
 	for {
 		select {
 		case <-sigChannel:
@@ -190,7 +200,12 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 		default:
 			log.Infof("action: consulta_ganadores | result: in_progress | client_id: %v", c.config.ID)
 
-			c.createClientSocket()
+			if c.conn != nil {
+				c.conn.Close()
+			}
+			if err := c.createClientSocket(); err != nil {
+				return err
+			}
 
 			loteryWinnerConsult := FormatWinnerConsult(c.config.ID)
 			if err := SendClientMessage(c.conn, loteryWinnerConsult); err != nil {
@@ -208,13 +223,14 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 			if err != nil {
 				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
 					c.config.ID, err)
-				return fmt.Errorf("receive server ack failed: %w", err)
+				return fmt.Errorf("receive server ack for lottery response failed: %w", err)
 			}
 			success, winners := CheckLotteryResult(ack)
 			if !success {
 				log.Infof("action: consulta_ganadores | result: fail | status: not ready")
 				c.conn.Close()
-				time.Sleep(c.config.LoopPeriod)
+				time.Sleep(sleepTimer)
+				sleepTimer *= 2
 
 			} else {
 				log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
