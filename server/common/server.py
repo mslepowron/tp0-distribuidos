@@ -4,10 +4,8 @@ import signal
 import sys
 from common import utils, messages
 
-TOTAL_AGENCIES = 5
-
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, clients):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
@@ -17,6 +15,7 @@ class Server:
         self.lottery_finished = False
         self.client_completed_send = {}
         self.client_winners = {}
+        self.total_clients = clients
 
 
     def shutdown_server(self):
@@ -82,7 +81,7 @@ class Server:
 
                         self.client_completed_send[agency_id] = True
 
-                        if len(self.client_completed_send) == TOTAL_AGENCIES and not self.lottery_finished:
+                        if len(self.client_completed_send) == self.total_clients and not self.lottery_finished:
                           self.lottery_finished = True
                           self.__process_lottery_winners()
                           logging.info(f'action: sorteo | result: success')

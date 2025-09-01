@@ -227,7 +227,6 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 			}
 			success, winners := CheckLotteryResult(ack)
 			if !success {
-				log.Infof("action: consulta_ganadores | result: fail | status: not ready")
 				c.conn.Close()
 				time.Sleep(sleepTimer)
 				sleepTimer *= 2
