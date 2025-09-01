@@ -1,12 +1,12 @@
 package common
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"fmt"
 
 	"github.com/op/go-logging"
 )
@@ -57,14 +57,13 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-
 func (c *Client) StartClientLoop() {
 
 	var err error = nil
-	
+
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
-	
+
 	if err := c.createClientSocket(); err != nil {
 		return
 	}
@@ -74,29 +73,37 @@ func (c *Client) StartClientLoop() {
 			c.conn.Close()
 		}
 	}()
-	
+
 	err = c.SendClientBets(sigChannel)
 	if err != nil {
 		return
 	}
-	
+
 	err = c.SendEndOfBetsMessage(sigChannel)
-	if err != nil{
-		return
-	}
-
-	ack, err := RecieveServerAck(c.conn)
 	if err != nil {
-		log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		return
 	}
+	/*
+		ack, err := RecieveServerAck(c.conn)
+		if err != nil {
+			log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			return
+		}
 
-	agencyBets := len(c.bets)
+		agencyBets := len(c.bets)
 
-	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
-		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
-	} else {
-		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
+		if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
+			log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
+		} else {
+			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
+			return
+		}
+	*/
+	c.conn.Close()
+
+	err = c.WaitForLoteryResults(sigChannel)
+	if err != nil {
+		return
 	}
 
 }
@@ -109,7 +116,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 		select {
 		case <-sigChannel:
 			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-			return fmt.Errorf("client_shutdown")  //es para que entre en el defer cierre y salga
+			return fmt.Errorf("client_shutdown") //es para que entre en el defer cierre y salga
 		default:
 			end := i + c.config.BatchMaxAmount
 			if end > agencyBets {
@@ -120,7 +127,6 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 			betCount += len(batch)
 
 			message := FormatBatchMessage(batch, betCount)
-
 
 			if err := SendClientMessage(c.conn, message); err != nil {
 				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
@@ -148,7 +154,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 			}
 
 			time.Sleep(c.config.LoopPeriod)
-	
+
 		}
 
 	}
@@ -172,4 +178,49 @@ func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
 	}
 
 	return nil
+}
+
+func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
+
+	for {
+		select {
+		case <-sigChannel:
+			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
+			return fmt.Errorf("client_shutdown")
+		default:
+			log.Infof("action: consulta_ganadores | result: in_progress | client_id: %v", c.config.ID)
+
+			c.createClientSocket()
+
+			loteryWinnerConsult := FormatWinnerConsult(c.config.ID)
+			if err := SendClientMessage(c.conn, loteryWinnerConsult); err != nil {
+				log.Errorf("action: send_message | result: fail | client_id: %v | error: could not send lotery winner consult to server %v",
+					c.config.ID,
+					err,
+				)
+				return fmt.Errorf("error sending end of bets file message")
+			}
+
+			//aca tiene que ir un wait for server, y el server le responde
+			//con un error o con un result. Segun eso logguea al winner cierra la conexio
+			//y sale (break), o si devuelve error, cierra la conexion mete un sleep y reintetna
+			ack, err := RecieveServerAck(c.conn)
+			if err != nil {
+				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
+					c.config.ID, err)
+				return fmt.Errorf("receive server ack failed: %w", err)
+			}
+			success, winners := CheckLotteryResult(ack)
+			if !success {
+				log.Infof("action: consulta_ganadores | result: fail | status: not ready")
+				c.conn.Close()
+				time.Sleep(c.config.LoopPeriod)
+
+			} else {
+				log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+				c.conn.Close()
+				return nil
+			}
+		}
+	}
 }

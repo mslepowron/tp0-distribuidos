@@ -125,6 +125,10 @@ func FormatEndMessage(agencyId string) string {
 	return fmt.Sprintf("END_OF_FILE;%s", agencyId)
 }
 
+func FormatWinnerConsult(agencyId string) string {
+	return fmt.Sprintf("LOTERY_WINNER;%s", agencyId)
+}
+
 // WriteFull send all the data through the server connection while avoiding short-writes
 func WriteFull(connection net.Conn, data []byte) error {
 	totalWritten := 0
@@ -237,8 +241,32 @@ func CheckBatchServerResponse(ack string) (success bool, batchSize int) {
 		}
 	} else {
 		// EOF o cualquier otro caso
-		success = true // o false según lo que quieras manejar
+		success = true
 		batchSize = 0
+	}
+	return
+}
+
+func CheckLotteryResult(ack string) (success bool, winners []string) {
+	winners = nil
+	success = false
+
+	ack = strings.TrimSpace(ack)
+
+	if strings.HasPrefix(ack, "WINNERS;") {
+		success = true
+		parts := strings.Split(ack, ";")
+		if len(parts) > 1 {
+			winners = parts[1:] // el 1ro es el prefijo desp estan los dnis ganadores
+		} else {
+			winners = []string{}
+		}
+	} else if strings.HasPrefix(ack, "ERROR_LOTTERY_RESPONSE") {
+		success = false
+		winners = nil
+	} else {
+		success = false
+		winners = nil
 	}
 	return
 }

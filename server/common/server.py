@@ -4,7 +4,7 @@ import signal
 import sys
 from common import utils, messages
 
-
+TOTAL_AGENCIES = 5
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -14,6 +14,9 @@ class Server:
         self._server_socket.listen(listen_backlog)
         self.shutdown = False
         self.client_sockets = []
+        self.lottery_finished = False
+        self.client_completed_send = {}
+        self.client_winners = {}
 
 
     def shutdown_server(self):
@@ -63,19 +66,30 @@ class Server:
         """
         try:
             agency_bets = 0
-            end_batch_read = False
+            
 
-            while not end_batch_read:
+            while True:
                 message = messages.recieve_client_messasge(client_sock)
 
                 is_eof, agency_id = messages.is_end_of_agency_file(message)
                 if is_eof:
-                    end_batch_read = True
-                    logging.info(f"action: procesamiento_apuestas_cliente | result: success | cantidad: {agency_bets}")
+                    self.client_completed_send[agency_id] = True
+                    logging.info(f"action: procesamiento_apuestas_cliente | result: success | agency: {agency_id} | cantidad: {agency_bets}")
                     
-                    ack_str = "{};{}\n".format(agency_bets, agency_id)
-                    ack_bytes = ack_str.encode("utf-8")
-                    messages.send_ack_client(client_sock, ack_bytes)
+                    if len(self.client_completed_send) == TOTAL_AGENCIES and not self.lottery_finished:
+                        self.lottery_finished = True
+                        self.__process_lottery_winners()
+                        logging.info(f'action: sorteo | result: success')
+                if message.startswith("LOTERY_WINNER;"):
+                    agency_id = message.split(";")[1]
+                    if self.lottery_finished:
+                        winners = self.client_winners.get(agency_id, [])
+                        response_winners = "WINNERS;" + ";".join(winners) + "\n"
+                        messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
+                    else:
+                        response_error = "ERROR_LOTERY_RESPONSE\n"
+                        messages.send_ack_client(client_sock, response_error.encode("utf-8"))
+                    continue
                 else:
                     try:
                         bets = messages.decode_batch_bets(message)
@@ -113,3 +127,13 @@ class Server:
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
+
+    def __process_lottery_winners(self):
+        """
+        loads de agencys bets and uses has_won to calculate the
+        agency's winners
+        """
+        all_bets = utils.load_bets()
+        for agency_id in self.client_completed_send:
+            winners = [bet.document for bet in all_bets if bet.agency == agency_id and utils.has_won(bet)]
+            self.client_winners[agency_id] = winners
