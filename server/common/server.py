@@ -100,21 +100,22 @@ class Server:
                 agency_id = message.split(";")[1]
                 print("LE LLEGA PREG LOTERIA DE CLIENT {}".format(agency_id))
                 print("FINISHED CLIENTS {}/{}".format(self.finished_clients, self.total_clients))
-                if int(self.finished_clients) == int(self.total_clients) and not self.lottery_finished:
+                if int(self.finished_clients) == int(self.total_clients):
+                    if not self.lottery_finished:
                         print("CALCULA LOTERIA")
                         self.lottery_finished = True
                         self.__process_lottery_winners()
-                          
+                            
                         logging.info(f'action: sorteo | result: success')
                 
-                if self.lottery_finished:
-                    winners = self.client_winners.get(agency_id, [])
-                    response_winners = "WINNERS;" + ";".join(winners) + "\n"
-                    messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
-                else:
-                    response_error = "ERROR_LOTERY_RESPONSE\n"
-                    print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
-                    messages.send_ack_client(client_sock, response_error.encode("utf-8"))
+                    if self.lottery_finished:
+                        winners = self.client_winners.get(agency_id, [])
+                        response_winners = "WINNERS;" + ";".join(winners) + "\n"
+                        messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
+                # else:
+                #     response_error = "ERROR_LOTERY_RESPONSE\n"
+                #     print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
+                #     messages.send_ack_client(client_sock, response_error.encode("utf-8"))
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
@@ -143,7 +144,13 @@ class Server:
         agency's winners
         """
         all_bets = list(utils.load_bets())
-        for agency_id in self.client_completed_send:
-            agency_int = int(agency_id)
-            winners = [bet.document for bet in all_bets if bet.agency == agency_int and utils.has_won(bet)]
-            self.client_winners[agency_id] = winners
+        winners_by_agency = {}
+
+        for bet in all_bets:
+            if utils.has_won(bet):
+                agency_id = str(bet.agency) 
+                if agency_id not in winners_by_agency:
+                    winners_by_agency[agency_id] = []
+                winners_by_agency[agency_id].append(bet.document)
+
+        self.client_winners = winners_by_agency

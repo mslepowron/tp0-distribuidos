@@ -247,21 +247,30 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 			// }
 
 			ack, err := receiveLotteryMessage(c.conn)
-			if err != nil {
-				return err
-			}
-			success, winners := CheckLotteryResult(ack, c.config.ID)
-			if !success {
+			if err == nil {
+				success, winners := CheckLotteryResult(ack, c.config.ID)
+				if success {
+					log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+					c.conn.Close()
+					return nil
+				}
+			} else {
 				c.conn.Close()
 				time.Sleep(sleepTimer)
 				sleepTimer *= 2
-
-			} else {
-				log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
-				c.conn.Close()
-				return nil
-				//break loop
 			}
+			// success, winners := CheckLotteryResult(ack, c.config.ID)
+			// if !success {
+			// 	c.conn.Close()
+			// 	time.Sleep(sleepTimer)
+			// 	sleepTimer *= 2
+
+			// } else {
+			// 	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+			// 	c.conn.Close()
+			// 	return nil
+			// 	//break loop
+			// }
 		}
 	}
 
