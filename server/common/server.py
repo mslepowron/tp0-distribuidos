@@ -146,11 +146,13 @@ class Server:
         all_bets = list(utils.load_bets())
         winners_by_agency = {}
 
+        agencies = set(str(bet.agency) for bet in all_bets)
+        for agency_id in agencies:
+            winners_by_agency[agency_id] = []
+
         for bet in all_bets:
             if utils.has_won(bet):
-                agency_id = str(bet.agency) 
-                if agency_id not in winners_by_agency:
-                    winners_by_agency[agency_id] = []
+                agency_id = str(bet.agency)
                 winners_by_agency[agency_id].append(bet.document)
 
         self.client_winners = winners_by_agency

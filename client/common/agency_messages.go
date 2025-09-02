@@ -275,10 +275,11 @@ func CheckLotteryResult(ack string, id string) (success bool, winners []string) 
 		print("LE LLEGA WINNERS A %v", id)
 		success = true
 		parts := strings.Split(ack, ";")
-		if len(parts) > 1 {
-			winners = parts[1:] // el 1ro es el prefijo desp estan los dnis ganadores
-		} else {
-			winners = []string{}
+		winners = []string{}
+		for _, p := range parts[1:] {
+			if p != "" {
+				winners = append(winners, p)
+			}
 		}
 	} else if strings.HasPrefix(ack, "ERROR_LOTTERY_RESPONSE") {
 		print("LE LLEGA LOTERY A %v", id)
