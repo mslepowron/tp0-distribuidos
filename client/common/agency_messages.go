@@ -254,7 +254,8 @@ func CheckBatchServerResponse(ack string) (success bool, batchSize int) {
 	return
 }
 
-func receiveLotteryMessage(conn net.Conn) (string, error) {
+// ReceiveLotteryMessage reads the server response when client asks for the lotery winners
+func ReceiveLotteryMessage(conn net.Conn) (string, error) {
 	msg, err := bufio.NewReader(conn).ReadString('\n')
 	msg = strings.TrimSpace(msg)
 	if err == nil && msg == "ERROR_LOTTERY_RESPONSE" {
@@ -265,6 +266,8 @@ func receiveLotteryMessage(conn net.Conn) (string, error) {
 	return msg, err
 }
 
+// CheckLotteryResult decodes the server response to a LOTERY_WINNER message
+// If the response is ready it will recieve the agency's winners.
 func CheckLotteryResult(ack string, id string) (success bool, winners []string) {
 	winners = nil
 	success = false
@@ -272,7 +275,6 @@ func CheckLotteryResult(ack string, id string) (success bool, winners []string) 
 	ack = strings.TrimSpace(ack)
 
 	if strings.HasPrefix(ack, "WINNERS;") {
-		print("LE LLEGA WINNERS A %v", id)
 		success = true
 		parts := strings.Split(ack, ";")
 		winners = []string{}
@@ -281,10 +283,9 @@ func CheckLotteryResult(ack string, id string) (success bool, winners []string) 
 				winners = append(winners, p)
 			}
 		}
-	} else if strings.HasPrefix(ack, "ERROR_LOTTERY_RESPONSE") {
-		print("LE LLEGA LOTERY A %v", id)
+		/*} else if strings.HasPrefix(ack, "ERROR_LOTTERY_RESPONSE") {
 		success = false
-		winners = nil
+		winners = nil*/
 	} else {
 		success = false
 		winners = nil

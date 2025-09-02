@@ -198,3 +198,57 @@ log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, 
 ---
 
 ### Ejercicio 7
+
+_Flujo de Mensajes_
+
+Para este ejercicio se realizaron algunas modificaciones a el flujo de mensajes que se manejaba anteriormente. En cuanto a los _batchs_ de apuestas, se conserva el protocolo desarrollado en el ejercicio 5, y la separación de las diferentes apuestas que se envian en el batch se identifican con un ```\n```
+
+Teniendo en cuenta que el cliente también se tiene que comunicar con el server para solicitar a los ganadores del sorteo, se tomó como convención diferenciar estos dos casos, enviando un mensaje más antes de enviar los _batch_ de apuestas.
+
+Si el cliente se está comunicando con el server para enviarle las apuestas, antes de mandar los batches envía un mensaje ```BETS```  
+
+Una vez que el cliente finaliza el envío de las apuestas, envía un mensaje ```END_OF_FILE;<id_cliente>``` para notificar al servidor que ha terminado. Una vez que el server recibe este mensaje, guarda internamente el dato de que ha finalizado una agencia más en el envío de datos.
+
+Inmediatamente después, el cliente le manda al server un mensaje ```LOTERY_WINNER;<id_cliente>``` consultando si estan listos los resultados de los sorteos.
+
+Los clientes loopean sobre una función 
+```go
+func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
+} 
+```
+
+Donde esperan el resultado del sorteo. En cada loop de la funcion, envia un mensaje ```LOTERY_WINNER;<id_cliente>```. Si el servidor le contesta con un mensaje con el header ```WINNERS```, significa que el sorteo ha finalizado (todos los clientes cargaron sus apuestas) y los resultados están listos. En caso de que no estan disponibles los resultados todavía, un cliente que ya envío sus apuestas, y esta consultando por sus resultados, continúa loopeando sobre la función ```WaitForLoteryResults``
+
+_Conexiones_
+
+En cuanto a la primera parte del proceso (envío de apuestas), la comunicación entre cada cliente y servidor se realiza sobre una única conexión.
+
+En cuanto a la segunda parte, para consultar si los resultados están listos cada cliente levanta una conexión con el servidor por cada iteración de la función ``WaitForLoteryResults``:
+  - Si el server recibió los datos de todas las agencias de  lotería, le contesta con un mensaje de exito al cliente con el header ```WINNER```, seguido de todos los documentos de los ganadores de esa agencia y el cliente finaliza su trabajo
+  - En caso de que no esten listos los datos de todas las agencias, el cliente cierra la conexión y espera un determinado tiempo para volver a reintentar la consulta.
+
+_Cantidad de clientes esperados configurable_
+
+El servidor debe esperar a recibir los datos de todas las agencias conectadas antes de procesar el sorteo. Para que la cantidad de clientes se pueda manejar de manera flexible, se utiliza una variable de entorno para que el servidor sepa a cuantos clientes debe esperar antes de enviar a los ganadores. Esto se configura según el valor almacenado en el docker-compose-dev.yaml, que se configura según el script desarrollado en los primeros puntos.
+
+_Otras Aclaraciones_
+
+El server le manda un mensaje BATCH OK cada vez que procesa correctamente un batch del client. En el ejercicio anterior, cada vez que
+el cliente recibia ese mensaje imprimia un log. Para este ejercicio se eliminan esos logs y quedo unicamente un log final cuando el
+server le responde el mensaje EOF al client (es decirque proceso todos los batchs correctamente y puede seguir.)
+
+Esto se hizo para mayor claridad a la hora de leer los logs y que se vea bien que se enviaron todos los batch, que consulta por el sorteo y hasta que no esten todos los clientes listos no recibe respuesta, y que luego de recibirla sale con exit code 0.
+
+  **Uso:**  
+  Se debe correr, desde la raiz del proyecto:
+  ```
+  ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
+  ```
+  por ejemplo:
+  ```
+  ./generar-compose.sh docker-compose-dev.yaml 5
+  ```
+  Luego se levanta el sistema con:
+  ```
+  make docker-compose-up
+  ```

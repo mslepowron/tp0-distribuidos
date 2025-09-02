@@ -64,34 +64,15 @@ func (c *Client) StartClientLoop() {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 
-	// if err := c.createClientSocket(); err != nil {
-	// 	return
-	// }
-
 	defer func() {
 		if c.conn != nil {
 			c.conn.Close()
 		}
 	}()
 
-	// message := FormatBetSendingMessage()
-
-	// if err := SendClientMessage(c.conn, message); err != nil {
-	// 	log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-	// 		c.config.ID,
-	// 		err,
-	// 	)
-	// 	return
-	// }
-
 	if len(c.bets) > 0 {
 		c.SendClientBets(sigChannel)
 	}
-
-	// err = c.SendClientBets(sigChannel)
-	// if err != nil {
-	// 	return
-	// }
 
 	err = c.SendEndOfBetsMessage(sigChannel)
 	if err != nil {
@@ -120,8 +101,11 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 
+	log.Infof("action: exit | result: success | client_id: %v | status_code: 0", c.config.ID)
+
 }
 
+// SendClientBets Sends messages to the server with the agency's bets in batches
 func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 	if err := c.createClientSocket(); err != nil {
 		return fmt.Errorf("error creating client socket")
@@ -144,7 +128,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 		select {
 		case <-sigChannel:
 			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-			return fmt.Errorf("client_shutdown") //es para que entre en el defer cierre y salga
+			return fmt.Errorf("client_shutdown") //es para que entre en el defer cierre y salga y no siga con los wait lottery results
 		default:
 			end := i + c.config.BatchMaxAmount
 			if end > agencyBets {
@@ -177,8 +161,8 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 					c.config.ID, batchSize)
 				return fmt.Errorf("batch failed at size %v", batchSize)
 			} else {
-				//log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
-				//	c.config.ID, batchSize)
+				/*log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
+				c.config.ID, batchSize)*/
 			}
 
 			//time.Sleep(c.config.LoopPeriod)
@@ -189,6 +173,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 	return nil
 }
 
+// SendEndOfBetsMessage Sends a message to the server informing it that has sent all the agency's bets
 func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
 	select {
 	case <-sigChannel:
@@ -208,9 +193,9 @@ func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
 	return nil
 }
 
+// WaitForLoteryResults sends messages to the server asking for the agency's lotery winners.
 func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 	sleepTimer := 200 * time.Millisecond
-	//loop:
 	for {
 		select {
 		case <-sigChannel:
@@ -236,17 +221,7 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 				return fmt.Errorf("error sending end of bets file message")
 			}
 
-			//aca tiene que ir un wait for server, y el server le responde
-			//con un error o con un result. Segun eso logguea al winner cierra la conexio
-			//y sale (break), o si devuelve error, cierra la conexion mete un sleep y reintetna
-			// ack, err := RecieveServerAck(c.conn)
-			// if err != nil {
-			// 	log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
-			// 		c.config.ID, err)
-			// 	return fmt.Errorf("receive server ack for lottery response failed: %w", err)
-			// }
-
-			ack, err := receiveLotteryMessage(c.conn)
+			ack, err := ReceiveLotteryMessage(c.conn)
 			if err == nil {
 				success, winners := CheckLotteryResult(ack, c.config.ID)
 				if success {
@@ -259,20 +234,6 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 				time.Sleep(sleepTimer)
 				sleepTimer *= 2
 			}
-			// success, winners := CheckLotteryResult(ack, c.config.ID)
-			// if !success {
-			// 	c.conn.Close()
-			// 	time.Sleep(sleepTimer)
-			// 	sleepTimer *= 2
-
-			// } else {
-			// 	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
-			// 	c.conn.Close()
-			// 	return nil
-			// 	//break loop
-			// }
 		}
 	}
-
-	//return nil
 }
