@@ -13,7 +13,7 @@ class Server:
         self.shutdown = False
         self.client_sockets = []
         self.lottery_finished = False
-        self.client_completed_send = {}
+        self.finished_clients = 0
         self.client_winners = {}
         self.total_clients = clients
 
@@ -72,26 +72,18 @@ class Server:
                     
                     is_eof, agency_id = messages.is_end_of_agency_file(message)
                     if is_eof:
-                    
                         logging.info(f"action: apuesta_recibida | result: success | cantidad: {agency_bets}")
                         
                         ack_str = "{};{}\n".format(agency_bets, agency_id)
                         ack_bytes = ack_str.encode("utf-8")
                         messages.send_ack_client(client_sock, ack_bytes)
-
-                        self.client_completed_send[agency_id] = True
-
-                        if len(self.client_completed_send) == self.total_clients and not self.lottery_finished:
-                          self.lottery_finished = True
-                          self.__process_lottery_winners()
-                          logging.info(f'action: sorteo | result: success')
-
+                        self.finished_clients += 1   
                         break
                     else:
                         try:
                             bets = messages.decode_batch_bets(message)
                             utils.store_bets(bets)
-                            logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
+                            #logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
                             agency_bets += len(bets)
 
                             ack_str = "BATCH_OK;{}\n".format(len(bets))
@@ -106,12 +98,22 @@ class Server:
                             messages.send_ack_client(client_sock, ack_bytes)
             if message.startswith("LOTERY_WINNER;"):
                 agency_id = message.split(";")[1]
+                print("LE LLEGA PREG LOTERIA DE CLIENT {}".format(agency_id))
+                print("FINISHED CLIENTS {}/{}".format(self.finished_clients, self.total_clients))
+                if int(self.finished_clients) == int(self.total_clients) and not self.lottery_finished:
+                        print("CALCULA LOTERIA")
+                        self.lottery_finished = True
+                        self.__process_lottery_winners()
+                          
+                        logging.info(f'action: sorteo | result: success')
+                
                 if self.lottery_finished:
                     winners = self.client_winners.get(agency_id, [])
                     response_winners = "WINNERS;" + ";".join(winners) + "\n"
                     messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
                 else:
                     response_error = "ERROR_LOTERY_RESPONSE\n"
+                    print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
                     messages.send_ack_client(client_sock, response_error.encode("utf-8"))
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")

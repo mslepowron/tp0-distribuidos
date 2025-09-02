@@ -48,6 +48,8 @@ def main():
     listen_backlog = config_params["listen_backlog"]
     clients = config_params["clients"]
 
+    print("CANTIDAD DE CLIENTES ENV VAR:", clients)
+
     initialize_log(logging_level)
 
     # Log config parameters at the beginning of the program to verify the configuration

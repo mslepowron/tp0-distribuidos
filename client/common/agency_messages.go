@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -253,13 +254,25 @@ func CheckBatchServerResponse(ack string) (success bool, batchSize int) {
 	return
 }
 
-func CheckLotteryResult(ack string) (success bool, winners []string) {
+func receiveLotteryMessage(conn net.Conn) (string, error) {
+	msg, err := bufio.NewReader(conn).ReadString('\n')
+	msg = strings.TrimSpace(msg)
+	if err == nil && msg == "ERROR_LOTTERY_RESPONSE" {
+		log.Error("action: receive_message | result: fail | error: server failed")
+		return msg, errors.New("server failed")
+	}
+
+	return msg, err
+}
+
+func CheckLotteryResult(ack string, id string) (success bool, winners []string) {
 	winners = nil
 	success = false
 
 	ack = strings.TrimSpace(ack)
 
 	if strings.HasPrefix(ack, "WINNERS;") {
+		print("LE LLEGA WINNERS A %v", id)
 		success = true
 		parts := strings.Split(ack, ";")
 		if len(parts) > 1 {
@@ -268,6 +281,7 @@ func CheckLotteryResult(ack string) (success bool, winners []string) {
 			winners = []string{}
 		}
 	} else if strings.HasPrefix(ack, "ERROR_LOTTERY_RESPONSE") {
+		print("LE LLEGA LOTERY A %v", id)
 		success = false
 		winners = nil
 	} else {

@@ -1,7 +1,7 @@
 import sys
 
 def generate_docker_compose(file, clients):
-    compose = """name: tp0
+    compose = f"""name: tp0
 services:
   server:
     container_name: server

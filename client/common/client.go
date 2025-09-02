@@ -64,9 +64,9 @@ func (c *Client) StartClientLoop() {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 
-	if err := c.createClientSocket(); err != nil {
-		return
-	}
+	// if err := c.createClientSocket(); err != nil {
+	// 	return
+	// }
 
 	defer func() {
 		if c.conn != nil {
@@ -74,20 +74,24 @@ func (c *Client) StartClientLoop() {
 		}
 	}()
 
-	message := FormatBetSendingMessage()
+	// message := FormatBetSendingMessage()
 
-	if err := SendClientMessage(c.conn, message); err != nil {
-		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
+	// if err := SendClientMessage(c.conn, message); err != nil {
+	// 	log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+	// 		c.config.ID,
+	// 		err,
+	// 	)
+	// 	return
+	// }
+
+	if len(c.bets) > 0 {
+		c.SendClientBets(sigChannel)
 	}
 
-	err = c.SendClientBets(sigChannel)
-	if err != nil {
-		return
-	}
+	// err = c.SendClientBets(sigChannel)
+	// if err != nil {
+	// 	return
+	// }
 
 	err = c.SendEndOfBetsMessage(sigChannel)
 	if err != nil {
@@ -119,6 +123,20 @@ func (c *Client) StartClientLoop() {
 }
 
 func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
+	if err := c.createClientSocket(); err != nil {
+		return fmt.Errorf("error creating client socket")
+	}
+
+	message := FormatBetSendingMessage()
+
+	if err := SendClientMessage(c.conn, message); err != nil {
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return fmt.Errorf("error: client could not inform server about sending bets")
+	}
+
 	agencyBets := len(c.bets)
 	betCount := 0
 
@@ -159,8 +177,8 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 					c.config.ID, batchSize)
 				return fmt.Errorf("batch failed at size %v", batchSize)
 			} else {
-				log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
-					c.config.ID, batchSize)
+				//log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
+				//	c.config.ID, batchSize)
 			}
 
 			//time.Sleep(c.config.LoopPeriod)
@@ -192,6 +210,7 @@ func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
 
 func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 	sleepTimer := 200 * time.Millisecond
+	//loop:
 	for {
 		select {
 		case <-sigChannel:
@@ -203,6 +222,7 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 			if c.conn != nil {
 				c.conn.Close()
 			}
+
 			if err := c.createClientSocket(); err != nil {
 				return err
 			}
@@ -219,13 +239,18 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 			//aca tiene que ir un wait for server, y el server le responde
 			//con un error o con un result. Segun eso logguea al winner cierra la conexio
 			//y sale (break), o si devuelve error, cierra la conexion mete un sleep y reintetna
-			ack, err := RecieveServerAck(c.conn)
+			// ack, err := RecieveServerAck(c.conn)
+			// if err != nil {
+			// 	log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
+			// 		c.config.ID, err)
+			// 	return fmt.Errorf("receive server ack for lottery response failed: %w", err)
+			// }
+
+			ack, err := receiveLotteryMessage(c.conn)
 			if err != nil {
-				log.Errorf("action: receive_server_ack | result: fail | client_id: %v | error: %v",
-					c.config.ID, err)
-				return fmt.Errorf("receive server ack for lottery response failed: %w", err)
+				return err
 			}
-			success, winners := CheckLotteryResult(ack)
+			success, winners := CheckLotteryResult(ack, c.config.ID)
 			if !success {
 				c.conn.Close()
 				time.Sleep(sleepTimer)
@@ -235,7 +260,10 @@ func (c *Client) WaitForLoteryResults(sigChannel chan os.Signal) error {
 				log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
 				c.conn.Close()
 				return nil
+				//break loop
 			}
 		}
 	}
+
+	//return nil
 }
