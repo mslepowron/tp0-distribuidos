@@ -236,8 +236,7 @@ func CheckBatchServerResponse(ack string) (success bool, batchSize int) {
 			batchSize, _ = strconv.Atoi(strings.TrimSpace(serverAck[1]))
 		}
 	} else {
-		// EOF o cualquier otro caso
-		success = true // o false según lo que quieras manejar
+		success = true
 		batchSize = 0
 	}
 	return

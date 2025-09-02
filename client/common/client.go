@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -59,10 +60,10 @@ func (c *Client) createClientSocket() error {
 func (c *Client) StartClientLoop() {
 
 	var err error = nil
-	
+
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
-	
+
 	if err := c.createClientSocket(); err != nil {
 		return
 	}
@@ -72,14 +73,14 @@ func (c *Client) StartClientLoop() {
 			c.conn.Close()
 		}
 	}()
-	
+
 	err = c.SendClientBets(sigChannel)
 	if err != nil {
 		return
 	}
-	
+
 	err = c.SendEndOfBetsMessage(sigChannel)
-	if err != nil{
+	if err != nil {
 		return
 	}
 
@@ -99,7 +100,7 @@ func (c *Client) StartClientLoop() {
 
 }
 
-//SendClientBets sends all bets in agency file in batches to the server
+// SendClientBets sends all bets in agency file in batches to the server
 func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 	agencyBets := len(c.bets)
 	betCount := 0
@@ -108,7 +109,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 		select {
 		case <-sigChannel:
 			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
-			return fmt.Errorf("client_shutdown")  //es para que entre en el defer cierre y salga
+			return fmt.Errorf("client_shutdown") //es para que entre en el defer cierre y salga
 		default:
 			end := i + c.config.BatchMaxAmount
 			if end > agencyBets {
@@ -119,7 +120,6 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 			betCount += len(batch)
 
 			message := FormatBatchMessage(batch, betCount)
-
 
 			if err := SendClientMessage(c.conn, message); err != nil {
 				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
@@ -147,14 +147,14 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 			}
 
 			time.Sleep(c.config.LoopPeriod)
-	
+
 		}
 
 	}
 	return nil
 }
 
-//SendEndOfBetsMessage sends the end of bets message to the server to notify the whole file has been sent
+// SendEndOfBetsMessage sends the end of bets message to the server to notify the whole file has been sent
 func (c *Client) SendEndOfBetsMessage(sigChannel chan os.Signal) error {
 	select {
 	case <-sigChannel:
