@@ -2,6 +2,7 @@ import socket
 import logging
 import signal
 import sys
+import threading
 from common import utils, messages
 
 class Server:
@@ -16,6 +17,9 @@ class Server:
         self.finished_clients = 0
         self.client_winners = {}
         self.total_clients = clients
+        self.lottery_results_lock = threading.Lock()
+        self.bet_storting_lock = threading.Lock()
+        self.threads = []
 
 
     def shutdown_server(self):
@@ -26,16 +30,18 @@ class Server:
         logging.info('action: shutdown | result: in_progress')
         try:
             self._server_socket.close()
-            for client_sock in self.client_sockets:
-                try:
-                    client_sock.close()
-                except Exception as e:
-                    logging.info(f'action: close_client_socket | result: fail')
-                else:
-                    logging.info(f'action: close_client_socket | result: success')
-            logging.info(f'action: shutdown | result: success')
+            # for client_sock in self.client_sockets:
+            #     try:
+            #         client_sock.close()
+            #     except Exception as e:
+            #         logging.info(f'action: close_client_socket | result: fail')
+            #     else:
+            #         logging.info(f'action: close_client_socket | result: success')
+            # logging.info(f'action: shutdown | result: success')
         except Exception as e:
             logging.error(f'action: shutdown | result: fail')
+        self.__join_client_threads()
+        logging.info(f'action: shutdown | result: success')
 
 
     def run(self):
@@ -50,11 +56,18 @@ class Server:
         while not self.shutdown:
             try:
                 client_sock = self.__accept_new_connection()
-                self.client_sockets.append(client_sock)
-                self.__handle_client_connection(client_sock)
+                if client_sock:
+                    #self.client_sockets.append(client_sock)
+                    self.__handle_client_connection(client_sock)
+                    client_thread = threading.Thread(
+                    target=self.__handle_client_connection, args=(client_sock,), daemon=True)
+                    client_thread.start()
+                    self.threads.append(client_thread)
             except:
                 if self.shutdown:
                     break
+        
+        self.__join_client_threads(self)
 
     def __handle_client_connection(self, client_sock):
         """
@@ -77,14 +90,16 @@ class Server:
                         ack_str = "{};{}\n".format(agency_bets, agency_id)
                         ack_bytes = ack_str.encode("utf-8")
                         messages.send_ack_client(client_sock, ack_bytes)
-                        self.finished_clients += 1   
+                        with self.lottery_results_lock:
+                            self.finished_clients += 1   
                         break
                     else:
                         try:
                             bets = messages.decode_batch_bets(message)
-                            utils.store_bets(bets)
-                            #logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
-                            agency_bets += len(bets)
+                            with self.bet_storting_lock:
+                                utils.store_bets(bets)
+                                #logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
+                                agency_bets += len(bets)
 
                             ack_str = "BATCH_OK;{}\n".format(len(bets))
                             ack_bytes = ack_str.encode("utf-8")
@@ -98,30 +113,28 @@ class Server:
                             messages.send_ack_client(client_sock, ack_bytes)
             if message.startswith("LOTERY_WINNER;"):
                 agency_id = message.split(";")[1]
-                print("LE LLEGA PREG LOTERIA DE CLIENT {}".format(agency_id))
-                print("FINISHED CLIENTS {}/{}".format(self.finished_clients, self.total_clients))
-                if int(self.finished_clients) == int(self.total_clients):
-                    if not self.lottery_finished:
-                        print("CALCULA LOTERIA")
-                        self.lottery_finished = True
-                        self.__process_lottery_winners()
-                            
-                        logging.info(f'action: sorteo | result: success')
-                
-                    if self.lottery_finished:
-                        winners = self.client_winners.get(agency_id, [])
-                        response_winners = "WINNERS;" + ";".join(winners) + "\n"
-                        messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
-                # else:
-                #     response_error = "ERROR_LOTERY_RESPONSE\n"
-                #     print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
-                #     messages.send_ack_client(client_sock, response_error.encode("utf-8"))
+                with self.lottery_results_lock:
+                    if int(self.finished_clients) == int(self.total_clients):
+                        if not self.lottery_finished:
+                            self.lottery_finished = True
+                            self.__process_lottery_winners()
+                                
+                            logging.info(f'action: sorteo | result: success')
+                    
+                        if self.lottery_finished:
+                            winners = self.client_winners.get(agency_id, [])
+                            response_winners = "WINNERS;" + ";".join(winners) + "\n"
+                            messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
+                    # else:
+                    #     response_error = "ERROR_LOTERY_RESPONSE\n"
+                    #     print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
+                    #     messages.send_ack_client(client_sock, response_error.encode("utf-8"))
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
-            if client_sock in self.client_sockets:
-                self.client_sockets.remove(client_sock)
+            # if client_sock in self.client_sockets:
+            #     self.client_sockets.remove(client_sock)
 
 
     def __accept_new_connection(self):
@@ -156,3 +169,7 @@ class Server:
                 winners_by_agency[agency_id].append(bet.document)
 
         self.client_winners = winners_by_agency
+
+    def __join_client_threads(self):
+        for thread in self.threads:
+            thread.join()
