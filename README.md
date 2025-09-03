@@ -375,7 +375,7 @@ log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, 
   ```
   make docker-compose-up
   ```
-
+  Los archivos de cada agencia ```agency-${id}.csv``` deben estar en el directorio .data
 ---
 
 ### Ejercicio 7
@@ -433,6 +433,7 @@ Esto se hizo para mayor claridad a la hora de leer los logs y que se vea bien qu
   ```
   make docker-compose-up
   ```
+  Los archivos de cada agencia ```agency-${id}.csv``` deben estar en el directorio .data
 
 ## Parte 3
 
@@ -457,3 +458,19 @@ Para evitar problemas de concurrencia como race conditions, implemente dos locks
   - _bet_storig_lock_ : protege la operación del guardado de apuestas (```utils.store_bets```) para que no se corrompan los datos guardados.
 
 Para cerrar las conexiones y liberar los recursos una vez finalizado el programa, el server se guarda una lista con los threads activos de los clientes, y cuando se realiza el shutdown, se hace un ```join``` de los client threads.
+
+  **Uso:**  
+  Se debe correr, desde la raiz del proyecto:
+  ```
+  ./generar-compose.sh <archivo_de_salida.yaml> <cantidad de clientes>
+  ```
+  por ejemplo:
+  ```
+  ./generar-compose.sh docker-compose-dev.yaml 5
+  ```
+  Luego se levanta el sistema con:
+  ```
+  make docker-compose-up
+  ```
+
+Los archivos de cada agencia ```agency-${id}.csv``` deben estar en el directorio .data
