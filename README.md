@@ -376,6 +376,7 @@ log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, 
   make docker-compose-up
   ```
   Los archivos de cada agencia ```agency-${id}.csv``` deben estar en el directorio .data
+
 ---
 
 ### Ejercicio 7
