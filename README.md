@@ -180,6 +180,13 @@ Si la cantidad de apuestas recibia en el ack del server coincide con la cantidad
 ```go
 log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, agencyBets)
 ```
+Por último, se logguea:
+```go
+log.Infof("action: exit | result: success | client_id: %v | status_code: 0", <client_id>)
+```
+para evidenciar la correcta salida del cliente cuando finaliza el programa.
+
+Por 
 
   **Uso:**  
   Se debe correr, desde la raiz del proyecto:
@@ -194,5 +201,7 @@ log.Infof("action: apuesta_enviada | result: success | amount: %v", <agencyID>, 
   ```
   make docker-compose-up
   ```
+
+  Los archivos de cada agencia ```agency-${id}.csv``` deben estar en el directorio .data
 
 ---

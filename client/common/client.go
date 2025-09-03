@@ -97,7 +97,7 @@ func (c *Client) StartClientLoop() {
 	} else {
 		log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | amount: %v", c.config.ID, agencyBets)
 	}
-
+	log.Infof("action: exit | result: success | client_id: %v | status_code: 0", c.config.ID)
 }
 
 // SendClientBets sends all bets in agency file in batches to the server
