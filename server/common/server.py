@@ -58,7 +58,7 @@ class Server:
                 client_sock = self.__accept_new_connection()
                 if client_sock:
                     #self.client_sockets.append(client_sock)
-                    self.__handle_client_connection(client_sock)
+                    #self.__handle_client_connection(client_sock)
                     client_thread = threading.Thread(
                     target=self.__handle_client_connection, args=(client_sock,), daemon=True)
                     client_thread.start()
