@@ -98,11 +98,8 @@ class Server:
                             messages.send_ack_client(client_sock, ack_bytes)
             if message.startswith("LOTERY_WINNER;"):
                 agency_id = message.split(";")[1]
-                print("LE LLEGA PREG LOTERIA DE CLIENT {}".format(agency_id))
-                print("FINISHED CLIENTS {}/{}".format(self.finished_clients, self.total_clients))
                 if int(self.finished_clients) == int(self.total_clients):
                     if not self.lottery_finished:
-                        print("CALCULA LOTERIA")
                         self.lottery_finished = True
                         self.__process_lottery_winners()
                             
@@ -112,10 +109,6 @@ class Server:
                         winners = self.client_winners.get(agency_id, [])
                         response_winners = "WINNERS;" + ";".join(winners) + "\n"
                         messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
-                # else:
-                #     response_error = "ERROR_LOTERY_RESPONSE\n"
-                #     print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
-                #     messages.send_ack_client(client_sock, response_error.encode("utf-8"))
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:

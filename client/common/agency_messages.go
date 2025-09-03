@@ -283,9 +283,6 @@ func CheckLotteryResult(ack string, id string) (success bool, winners []string) 
 				winners = append(winners, p)
 			}
 		}
-		/*} else if strings.HasPrefix(ack, "ERROR_LOTTERY_RESPONSE") {
-		success = false
-		winners = nil*/
 	} else {
 		success = false
 		winners = nil

@@ -165,8 +165,6 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 				c.config.ID, batchSize)*/
 			}
 
-			//time.Sleep(c.config.LoopPeriod)
-
 		}
 
 	}
