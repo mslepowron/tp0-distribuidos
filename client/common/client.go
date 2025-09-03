@@ -164,9 +164,6 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 				/*log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
 				c.config.ID, batchSize)*/
 			}
-
-			//time.Sleep(c.config.LoopPeriod)
-
 		}
 
 	}

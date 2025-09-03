@@ -12,7 +12,6 @@ class Server:
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self.shutdown = False
-        self.client_sockets = []
         self.lottery_finished = False
         self.finished_clients = 0
         self.client_winners = {}
@@ -30,14 +29,6 @@ class Server:
         logging.info('action: shutdown | result: in_progress')
         try:
             self._server_socket.close()
-            # for client_sock in self.client_sockets:
-            #     try:
-            #         client_sock.close()
-            #     except Exception as e:
-            #         logging.info(f'action: close_client_socket | result: fail')
-            #     else:
-            #         logging.info(f'action: close_client_socket | result: success')
-            # logging.info(f'action: shutdown | result: success')
         except Exception as e:
             logging.error(f'action: shutdown | result: fail')
         self.__join_client_threads()
@@ -57,8 +48,6 @@ class Server:
             try:
                 client_sock = self.__accept_new_connection()
                 if client_sock:
-                    #self.client_sockets.append(client_sock)
-                    #self.__handle_client_connection(client_sock)
                     client_thread = threading.Thread(
                     target=self.__handle_client_connection, args=(client_sock,), daemon=True)
                     client_thread.start()
@@ -125,16 +114,10 @@ class Server:
                             winners = self.client_winners.get(agency_id, [])
                             response_winners = "WINNERS;" + ";".join(winners) + "\n"
                             messages.send_ack_client(client_sock, response_winners.encode("utf-8"))
-                    # else:
-                    #     response_error = "ERROR_LOTERY_RESPONSE\n"
-                    #     print("LE MANDA ERROR LOTERIA A CLIENT {}", agency_id)
-                    #     messages.send_ack_client(client_sock, response_error.encode("utf-8"))
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
-            # if client_sock in self.client_sockets:
-            #     self.client_sockets.remove(client_sock)
 
 
     def __accept_new_connection(self):
