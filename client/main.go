@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"os"
 	"strings"
@@ -91,6 +92,17 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
+func CreateFileReader() (*os.File, *csv.Reader, error) {
+	file, err := os.Open("agency.csv")
+	if err != nil {
+		log.Errorf("action: open_file | result: fail | error: %v", err)
+		return nil, nil, err
+	}
+
+	reader := csv.NewReader(file)
+	return file, reader, nil
+}
+
 func main() {
 	v, err := InitConfig()
 	if err != nil {
@@ -112,12 +124,17 @@ func main() {
 		BatchMaxAmount: v.GetInt("batch.maxAmount"),
 	}
 
-	bets, err := common.ReadAgencyBets(clientConfig.ID)
+	/*bets, err := common.ReadAgencyBets(clientConfig.ID)
 
+	if err != nil {
+		log.Criticalf("%s", err)
+	}*/
+
+	file, reader, err := CreateFileReader()
 	if err != nil {
 		log.Criticalf("%s", err)
 	}
 
-	client := common.NewClient(clientConfig, bets)
+	client := common.NewClient(clientConfig, file, reader)
 	client.StartClientLoop()
 }

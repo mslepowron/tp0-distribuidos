@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/csv"
 	"fmt"
 	"net"
 	"os"
@@ -28,15 +29,20 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
-	bets   []Bet
+	//bets   []Bet
+	client_bets int
+	file        *os.File
+	reader      *csv.Reader
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig, bets []Bet) *Client {
+func NewClient(config ClientConfig, file *os.File, reader *csv.Reader) *Client {
 	client := &Client{
-		config: config,
-		bets:   bets,
+		config:      config,
+		client_bets: 0,
+		file:        file,
+		reader:      reader,
 	}
 	return client
 }
@@ -67,12 +73,11 @@ func (c *Client) StartClientLoop() {
 	defer func() {
 		if c.conn != nil {
 			c.conn.Close()
+			c.file.Close()
 		}
 	}()
 
-	if len(c.bets) > 0 {
-		c.SendClientBets(sigChannel)
-	}
+	c.SendClientBets(sigChannel)
 
 	err = c.SendEndOfBetsMessage(sigChannel)
 	if err != nil {
@@ -85,7 +90,7 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 
-	agencyBets := len(c.bets)
+	agencyBets := c.client_bets
 
 	if CheckEndServerResponse(ack, agencyBets, c.config.ID) {
 		log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v", c.config.ID, agencyBets)
@@ -121,22 +126,22 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 		return fmt.Errorf("error: client could not inform server about sending bets")
 	}
 
-	agencyBets := len(c.bets)
 	betCount := 0
 
-	for i := 0; i < agencyBets; i += c.config.BatchMaxAmount {
+betsLoop:
+	for {
 		select {
 		case <-sigChannel:
 			log.Infof("action: client_shutdown | result: success | client_id: %v", c.config.ID)
 			return fmt.Errorf("client_shutdown") //es para que entre en el defer cierre y salga y no siga con los wait lottery results
 		default:
-			end := i + c.config.BatchMaxAmount
-			if end > agencyBets {
-				end = agencyBets
+			batch, err := ReadAgencyData(c.reader, c.config.ID, c.config.BatchMaxAmount)
+			if err != nil {
+				return fmt.Errorf("error reading agency bets from file: %w", err)
 			}
-
-			batch := c.bets[i:end]
-			betCount += len(batch)
+			if len(batch) == 0 {
+				break betsLoop
+			}
 
 			message := FormatBatchMessage(batch, betCount)
 
@@ -147,6 +152,7 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 				)
 				return fmt.Errorf("could not send bet batch: %w", err)
 			}
+			betCount += len(batch)
 
 			ack, err := RecieveServerAck(c.conn)
 			if err != nil {
@@ -164,9 +170,12 @@ func (c *Client) SendClientBets(sigChannel chan os.Signal) error {
 				/*log.Infof("action: apuesta_enviada | result: success | client_id: %v | amount: %v",
 				c.config.ID, batchSize)*/
 			}
-		}
 
+		}
 	}
+
+	c.client_bets = betCount
+	c.file.Close()
 	return nil
 }
 

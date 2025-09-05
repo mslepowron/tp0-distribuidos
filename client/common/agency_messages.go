@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -49,27 +50,16 @@ func BetData(clientID string) *Bet {
 	return bet
 }
 
-// ReadAgencyBets reads the bets from a CSV file and returns a slice of Bet structs
-func ReadAgencyBets(agencyId string) ([]Bet, error) {
-	file, err := os.Open("agency.csv") //lo saca de la config del docker compose (volume)
-
-	if err != nil {
-		return nil, fmt.Errorf("action: read_agency_file | result: fail | error: %v", err)
-	}
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-	reader.Comma = ','
-
-	lines, err := reader.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("action: read_agency_file | result: fail | error: reading CSV: %v", err)
-	}
-
+// ReadAgencyData reads the bets from a CSV file and returns a slice of Bet structs the size of the batchAmount
+func ReadAgencyData(reader *csv.Reader, agencyId string, batchAmount int) ([]Bet, error) {
 	var bets []Bet
-	for _, line := range lines {
-		if len(line) != 5 {
-			return nil, fmt.Errorf("action: read_agency_file | result: fail | error: invalid csv format at line %v", line)
+	for i := 0; i < batchAmount; i++ {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Errorf("action: read_line | result: fail | error: %v", err)
+			return nil, err
 		}
 
 		bet := Bet{

@@ -39,7 +39,7 @@ def initialize_config():
 def graceful_shutdown(server):
     if graceful_shutdown.server:
         graceful_shutdown.server.shutdown_server()
-    sys.exit(0)
+
 
 def main():
     config_params = initialize_config()
